@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.env
+venv/
+static/images/uploads/candidates/*
+static/images/uploads/parties/*
