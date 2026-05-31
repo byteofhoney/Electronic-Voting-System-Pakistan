@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Waiting — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid #c8e6d4;
+            border-top-color: var(--evs-green);
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="evs-full-screen">
+
+    <div class="evs-voter-topbar">
+        <div class="evs-voter-topbar__brand">☪ الیکٹرانک ووٹنگ سسٹم</div>
+        <div class="evs-voter-topbar__station">Voting Machine</div>
+    </div>
+
+    <div class="evs-full-screen__body">
+        <div class="evs-login-card" style="text-align:center;">
+
+            <div class="spinner"></div>
+
+            <div class="evs-waiting__title">Please Wait</div>
+            <div class="evs-waiting__info">
+                Hello, <strong>{{ voter_name }}</strong>.<br>
+                The Polling Officer is verifying your identity.<br>
+                Please remain at the machine.
+            </div>
+
+            <div id="status-box"
+                 class="evs-alert evs-alert--info"
+                 style="text-align:left;font-size:12px;">
+                Checking for Polling Officer approval...
+            </div>
+
+            <div id="rejected-box"
+                 class="evs-alert evs-alert--danger"
+                 style="display:none;font-size:12px;">
+                Your request was rejected by the Polling Officer.
+                Please approach the Polling Officer's desk for assistance.
+            </div>
+
+        </div>
+    </div>
+
+    <div class="evs-full-screen__footer">
+        Electronic Voting System — Election Commission of Pakistan &nbsp;|&nbsp;
+        Secure &amp; Confidential
+    </div>
+
+</div>
+
+<script>
+let attempts = 0;
+
+function checkStatus() {
+    fetch('{{ url_for("voter.check_status") }}')
+        .then(r => r.json())
+        .then(d => {
+            attempts++;
+            if (d.status === 'approved') {
+                document.getElementById('status-box').className =
+                    'evs-alert evs-alert--success';
+                document.getElementById('status-box').textContent =
+                    'Approved! Redirecting to ballot...';
+                setTimeout(() => {
+                    window.location.href = '{{ url_for("voter.ballot") }}';
+                }, 800);
+            } else if (d.status === 'rejected') {
+                document.getElementById('status-box').style.display = 'none';
+                document.getElementById('rejected-box').style.display = 'block';
+                // Stop polling after rejection
+            } else {
+                // Still pending — update message every ~10s so it feels alive
+                if (attempts % 5 === 0) {
+                    document.getElementById('status-box').textContent =
+                        'Still waiting for the Polling Officer... (' + attempts * 2 + 's)';
+                }
+                setTimeout(checkStatus, 2000);
+            }
+        })
+        .catch(() => setTimeout(checkStatus, 2000));
+}
+
+// Start polling after 1s
+setTimeout(checkStatus, 1000);
+</script>
+
+</body>
+</html>

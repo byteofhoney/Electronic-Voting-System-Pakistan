@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Parties — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Header -->
+    <div class="evs-header">
+        <div class="evs-header__brand">
+            <span class="evs-header__brand-icon">🗳️</span>
+            EVS — ECP Central Control
+        </div>
+        <div class="evs-header__right">
+            <span>{{ username }}</span>
+            <a href="{{ url_for('auth.logout') }}" class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+        </div>
+    </div>
+
+    <div class="evs-shell">
+
+        <!-- Sidebar -->
+        <div class="evs-sidebar">
+            <a href="{{ url_for('ecp.dashboard') }}" class="evs-sidebar__item">Dashboard</a>
+            <a href="{{ url_for('ecp.parties') }}" class="evs-sidebar__item active">Parties</a>
+            <a href="{{ url_for('ecp.officers') }}" class="evs-sidebar__item">Officers</a>
+            <a href="{{ url_for('ecp.results') }}" class="evs-sidebar__item">Results</a>
+            <a href="{{ url_for('ecp.audit_trail') }}" class="evs-sidebar__item">Audit Trail</a>
+            <a href="{{ url_for('ecp.login_logs') }}" class="evs-sidebar__item">Login Logs</a>
+        </div>
+
+        <div class="evs-content">
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                <div class="evs-alert evs-alert--{{ 'success' if category == 'success' else 'danger' }}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endwith %}
+
+            <div class="evs-section-title">Manage Parties</div>
+
+            <!-- Add Party Form -->
+            <div class="evs-card mb-16">
+                <div class="fw-500 mb-12">Add New Party</div>
+                <form method="POST" action="{{ url_for('ecp.add_party') }}" enctype="multipart/form-data">
+                    <div class="evs-grid-2">
+                        <div class="evs-form-group">
+                            <label class="evs-form-label">Party Name</label>
+                            <input type="text" name="party_name" class="evs-input"
+                                   placeholder="e.g. Pakistan Tehreek-e-Insaf" required>
+                        </div>
+                        <div class="evs-form-group">
+                            <label class="evs-form-label">Abbreviation</label>
+                            <input type="text" name="abbreviation" class="evs-input"
+                                   placeholder="e.g. PTI" required>
+                        </div>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Party Logo (optional)</label>
+                        <input type="file" name="logo" class="evs-input" accept="image/*">
+                    </div>
+                    <button type="submit" class="evs-btn evs-btn--primary">Add Party</button>
+                </form>
+            </div>
+
+            <!-- Parties Table -->
+            <div class="evs-card">
+                <div class="fw-500 mb-12">All Parties ({{ parties|length }})</div>
+                {% if parties %}
+                <div style="overflow-x:auto;">
+                    <table class="evs-table">
+                        <thead>
+                            <tr>
+                                <th style="width:60px;">Logo</th>
+                                <th>Party Name</th>
+                                <th style="width:130px;">Abbreviation</th>
+                                <th style="width:110px;">Added</th>
+                                <th style="width:90px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for party in parties %}
+                            <tr>
+                                <!-- Logo or fallback avatar -->
+                                <td>
+                                    {% if party.logo_path %}
+                                        <img src="{{ url_for('static', filename='images/uploads/parties/' + party.logo_path) }}"
+                                             style="width:32px;height:32px;object-fit:contain;border-radius:4px;">
+                                    {% else %}
+                                        <div class="evs-party-avatar party-avatar-auto"
+                                             data-abbr="{{ party.abbreviation }}">
+                                            {{ party.abbreviation[:2] }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Party Name -->
+                                <td class="fw-500">{{ party.party_name }}</td>
+
+                                <!-- Abbreviation badge — color set by JS -->
+                                <td>
+                                    <span class="evs-badge party-badge-auto"
+                                          data-abbr="{{ party.abbreviation }}">
+                                        {{ party.abbreviation }}
+                                    </span>
+                                </td>
+
+                                <!-- Date Added -->
+                                <td class="text-muted text-xs">
+                                    {{ party.created_at.strftime('%d %b %Y') }}
+                                </td>
+
+                                <!-- Delete -->
+                                <td>
+                                    <form method="POST"
+                                          action="{{ url_for('ecp.delete_party', party_id=party.party_id) }}"
+                                          onsubmit="return confirm('Delete {{ party.party_name }}? This cannot be undone.')">
+                                        <button type="submit"
+                                                class="evs-btn evs-btn--danger evs-btn--sm">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                    <div class="text-muted text-sm" style="padding:8px 0;">
+                        No parties added yet.
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Auto-color script: generates a unique stable color per abbreviation -->
+    <script>
+        function abbrToColor(abbr) {
+            // Simple hash of the string → hue value
+            let hash = 0;
+            for (let i = 0; i < abbr.length; i++) {
+                hash = abbr.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            // Keep saturation and lightness fixed for readability
+            const hue = Math.abs(hash) % 360;
+            return `hsl(${hue}, 55%, 38%)`;
+        }
+
+        // Apply to abbreviation badges
+        document.querySelectorAll('.party-badge-auto').forEach(function(el) {
+            const abbr = el.getAttribute('data-abbr');
+            el.style.background = abbrToColor(abbr);
+            el.style.color = '#ffffff';
+        });
+
+        // Apply same color to fallback avatars (when no logo)
+        document.querySelectorAll('.party-avatar-auto').forEach(function(el) {
+            const abbr = el.getAttribute('data-abbr');
+            el.style.background = abbrToColor(abbr);
+        });
+    </script>
+
+</body>
+</html>

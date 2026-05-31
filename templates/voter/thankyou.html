@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Thank You — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="evs-full-screen" style="align-items:center;justify-content:center;">
+
+    <div class="evs-full-screen__body">
+        <div class="evs-login-card evs-thankyou" style="max-width:400px;">
+
+            <div class="evs-thankyou__star">★</div>
+            <div class="evs-thankyou__title">شکریہ — Thank You</div>
+            <div class="evs-thankyou__body">
+                Your vote has been recorded securely.<br>
+                Thank you for participating in the democratic process of Pakistan.
+            </div>
+
+            <div class="evs-alert evs-alert--success"
+                 style="text-align:left;font-size:12px;">
+                Your vote was recorded anonymously. No receipt is issued to
+                protect ballot secrecy. Your identity cannot be linked to
+                your vote.
+            </div>
+
+            <!-- station_id is now dynamic — no longer hardcoded as 1 -->
+            <a href="{{ url_for('voter.vote_login', station_id=station_id) }}"
+               class="evs-btn evs-btn--primary evs-btn--full"
+               style="padding:12px;margin-top:8px;">
+                Next Voter — Return to Login
+            </a>
+
+        </div>
+    </div>
+
+    <div class="evs-full-screen__footer">
+        Electronic Voting System — Election Commission of Pakistan
+    </div>
+
+</div>
+</body>
+</html>

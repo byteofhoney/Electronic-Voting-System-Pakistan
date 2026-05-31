@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Results — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<!-- Header -->
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        EVS — ECP Central Control
+    </div>
+    <div class="evs-header__right">
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}"
+           class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-shell">
+
+    <!-- Sidebar -->
+    <div class="evs-sidebar">
+        <a href="{{ url_for('ecp.dashboard') }}"   class="evs-sidebar__item">Dashboard</a>
+        <a href="{{ url_for('ecp.parties') }}"     class="evs-sidebar__item">Parties</a>
+        <a href="{{ url_for('ecp.officers') }}"    class="evs-sidebar__item">Officers</a>
+        <a href="{{ url_for('ecp.results') }}"     class="evs-sidebar__item active">Results</a>
+        <a href="{{ url_for('ecp.audit_trail') }}" class="evs-sidebar__item">Audit Trail</a>
+        <a href="{{ url_for('ecp.login_logs') }}"  class="evs-sidebar__item">Login Logs</a>
+    </div>
+
+    <div class="evs-content">
+
+        {% if not election %}
+        <!-- No election found -->
+        <div class="evs-alert evs-alert--warning">
+            No election has been created yet. Results will appear here once
+            an election is opened and votes are cast.
+        </div>
+
+        {% else %}
+
+        <!-- ── Election Status Banner ──────────────────────────── -->
+        <div class="evs-alert
+            {{ 'evs-alert--success' if election.status == 'Active'
+               else 'evs-alert--info' }}"
+             style="margin-bottom:16px;">
+            <strong>{{ election.election_name }}</strong>
+            &nbsp;—&nbsp;
+            {% if election.status == 'Active' %}
+                🟢 Election is <strong>Active</strong> :
+                these are live counts, not final results.
+            {% elif election.status == 'Closed' %}
+                🔴 Election is <strong>Closed</strong> :
+                these are the final certified results.
+            {% else %}
+                ⏳ Election status: <strong>{{ election.status }}</strong>
+            {% endif %}
+            &nbsp;|&nbsp;
+            Date: {{ election.election_date.strftime('%d %b %Y')
+                     if election.election_date.__class__.__name__ == 'date'
+                     else election.election_date }}
+        </div>
+
+        <!-- ── Summary Stat Cards ─────────────────────────────── -->
+        <div class="evs-grid-4 mb-16">
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">
+                    {{ "{:,}".format(summary.total_votes_cast) }}
+                </div>
+                <div class="evs-stat-card__label">Total Votes Cast</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number"
+                     style="color:{% if summary.turnout_pct >= 50 %}#27500a
+                                  {% elif summary.turnout_pct >= 30 %}#b8963e
+                                  {% else %}#a32d2d{% endif %};">
+                    {{ summary.turnout_pct }}%
+                </div>
+                <div class="evs-stat-card__label">
+                    Voter Turnout
+                    <div class="text-faint" style="font-size:10px;">
+                        {{ "{:,}".format(summary.total_voted) }} of
+                        {{ "{:,}".format(summary.total_registered) }}
+                    </div>
+                </div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">
+                    {{ summary.na_seats_active }}
+                </div>
+                <div class="evs-stat-card__label">NA Seats with Votes</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">
+                    {{ summary.pa_seats_active }}
+                </div>
+                <div class="evs-stat-card__label">PA Seats with Votes</div>
+            </div>
+        </div>
+
+        <!-- ── Party Seat Tally ───────────────────────────────── -->
+        {% if party_tally %}
+        <div class="evs-card mb-16">
+            <div class="fw-500 mb-12">
+                Party Seat Tally
+                <span class="text-muted text-xs">
+                    (seats where party is currently leading)
+                </span>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="evs-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;">#</th>
+                            <th>Party</th>
+                            <th style="width:80px;">Abbr.</th>
+                            <th style="width:110px;">NA Seats</th>
+                            <th style="width:110px;">PA Seats</th>
+                            <th style="width:110px;">Total Seats</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in party_tally %}
+                        <tr>
+                            <td class="text-muted text-xs">{{ loop.index }}</td>
+                            <td class="fw-500">{{ p.party_name }}</td>
+                            <td>
+                                <span class="evs-badge party-badge-auto"
+                                      data-abbr="{{ p.abbreviation }}">
+                                    {{ p.abbreviation }}
+                                </span>
+                            </td>
+                            <td class="text-sm">{{ p.na_seats }}</td>
+                            <td class="text-sm">{{ p.pa_seats }}</td>
+                            <td>
+                                <strong style="color:var(--evs-green);">
+                                    {{ p.total_seats }}
+                                </strong>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ── Filters ───────────────────────────────────────── -->
+        <div class="evs-card mb-16">
+            <form method="GET" action="{{ url_for('ecp.results') }}">
+                <div class="audit-filter-bar">
+
+                    <div class="evs-form-group" style="margin:0;min-width:150px;flex:1;">
+                        <label class="evs-form-label">Province</label>
+                        <select name="province" class="evs-input">
+                            <option value="">All Provinces</option>
+                            {% for prov in provinces %}
+                            <option value="{{ prov.province_id }}"
+                                {{ 'selected' if province_filter == prov.province_id|string }}>
+                                {{ prov.province_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="evs-form-group" style="margin:0;min-width:130px;flex:1;">
+                        <label class="evs-form-label">Seat Type</label>
+                        <select name="type" class="evs-input">
+                            <option value="">NA + PA</option>
+                            <option value="NA"
+                                {{ 'selected' if type_filter == 'NA' }}>
+                                National Assembly (NA)
+                            </option>
+                            <option value="PA"
+                                {{ 'selected' if type_filter == 'PA' }}>
+                                Provincial Assembly (PA)
+                            </option>
+                        </select>
+                    </div>
+
+                    <div style="display:flex;gap:6px;
+                                align-items:flex-end;padding-bottom:1px;">
+                        <button type="submit"
+                                class="evs-btn evs-btn--primary evs-btn--sm">
+                            Apply
+                        </button>
+                        <a href="{{ url_for('ecp.results') }}"
+                           class="evs-btn evs-btn--outline evs-btn--sm">
+                            Clear
+                        </a>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+
+        <!-- ── NA Results ────────────────────────────────────── -->
+        {% if type_filter != 'PA' %}
+        {% if na_results %}
+        <div class="evs-section-title">
+            National Assembly Results
+            <span class="text-muted text-xs">({{ na_results|length }} constituencies)</span>
+        </div>
+
+        {% for con in na_results %}
+        <div class="evs-card mb-16">
+
+            <!-- Constituency Header -->
+            <div style="display:flex;align-items:center;
+                        justify-content:space-between;
+                        margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+                <div>
+                    <span class="fw-500">{{ con.na_number }}</span>
+                    {% if con.na_name %}
+                    <span class="text-muted text-xs">— {{ con.na_name }}</span>
+                    {% endif %}
+                </div>
+                <div style="display:flex;gap:12px;font-size:11px;color:var(--evs-text-muted);">
+                    <span>
+                        Votes cast:
+                        <strong>{{ "{:,}".format(con.total_con_votes) }}</strong>
+                    </span>
+                    <span>
+                        Registered:
+                        <strong>{{ "{:,}".format(con.registered) }}</strong>
+                    </span>
+                    <span>
+                        Turnout:
+                        <strong style="color:var(--evs-green);">
+                            {{ con.turnout }}%
+                        </strong>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Candidates -->
+            {% for cand in con.candidates %}
+            <div style="display:flex;align-items:center;gap:10px;
+                        margin-bottom:8px;flex-wrap:wrap;">
+
+                <!-- Leading badge on first candidate -->
+                {% if loop.first and con.total_con_votes > 0 %}
+                <span class="evs-badge evs-badge--success"
+                      style="min-width:60px;text-align:center;">
+                    Leading
+                </span>
+                {% else %}
+                <span style="min-width:60px;display:inline-block;"></span>
+                {% endif %}
+
+                <!-- Party badge -->
+                <span class="evs-badge party-badge-auto"
+                      data-abbr="{{ cand.party }}"
+                      style="min-width:50px;text-align:center;">
+                    {{ cand.party }}
+                </span>
+
+                <!-- Candidate name -->
+                <span class="text-sm fw-500"
+                      style="min-width:160px;">
+                    {{ cand.name }}
+                </span>
+
+                <!-- Vote bar -->
+                <div style="flex:1;min-width:120px;">
+                    <div style="background:var(--color-background-secondary,#e5e7eb);
+                                border-radius:999px;height:7px;overflow:hidden;">
+                        <div class="results-bar"
+                             style="width:{{ cand.pct }}%;"></div>
+                    </div>
+                </div>
+
+                <!-- Votes + pct -->
+                <span class="text-xs text-muted"
+                      style="min-width:90px;text-align:right;">
+                    {{ "{:,}".format(cand.votes) }}
+                    <span style="color:var(--evs-text-faint);">
+                        ({{ cand.pct }}%)
+                    </span>
+                </span>
+            </div>
+            {% endfor %}
+
+            {% if con.total_con_votes == 0 %}
+            <div class="text-muted text-xs">No votes cast in this constituency yet.</div>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+
+        {% else %}
+        <div class="evs-alert evs-alert--info">
+            No NA results yet
+            {% if province_filter %} for the selected province{% endif %}.
+        </div>
+        {% endif %}
+        {% endif %}
+
+        <!-- ── PA Results ────────────────────────────────────── -->
+        {% if type_filter != 'NA' %}
+        {% if pa_results %}
+        <div class="evs-section-title mt-16">
+            Provincial Assembly Results
+            <span class="text-muted text-xs">({{ pa_results|length }} constituencies)</span>
+        </div>
+
+        {% for con in pa_results %}
+        <div class="evs-card mb-16">
+
+            <div style="display:flex;align-items:center;
+                        justify-content:space-between;
+                        margin-bottom:10px;flex-wrap:wrap;gap:6px;">
+                <div>
+                    <span class="fw-500">{{ con.pa_number }}</span>
+                    {% if con.pa_name %}
+                    <span class="text-muted text-xs">— {{ con.pa_name }}</span>
+                    {% endif %}
+                </div>
+                <div style="display:flex;gap:12px;font-size:11px;
+                            color:var(--evs-text-muted);">
+                    <span>
+                        Votes cast:
+                        <strong>{{ "{:,}".format(con.total_con_votes) }}</strong>
+                    </span>
+                    <span>
+                        Registered:
+                        <strong>{{ "{:,}".format(con.registered) }}</strong>
+                    </span>
+                    <span>
+                        Turnout:
+                        <strong style="color:var(--evs-green);">
+                            {{ con.turnout }}%
+                        </strong>
+                    </span>
+                </div>
+            </div>
+
+            {% for cand in con.candidates %}
+            <div style="display:flex;align-items:center;gap:10px;
+                        margin-bottom:8px;flex-wrap:wrap;">
+
+                {% if loop.first and con.total_con_votes > 0 %}
+                <span class="evs-badge evs-badge--success"
+                      style="min-width:60px;text-align:center;">
+                    Leading
+                </span>
+                {% else %}
+                <span style="min-width:60px;display:inline-block;"></span>
+                {% endif %}
+
+                <span class="evs-badge party-badge-auto"
+                      data-abbr="{{ cand.party }}"
+                      style="min-width:50px;text-align:center;">
+                    {{ cand.party }}
+                </span>
+
+                <span class="text-sm fw-500" style="min-width:160px;">
+                    {{ cand.name }}
+                </span>
+
+                <div style="flex:1;min-width:120px;">
+                    <div style="background:var(--color-background-secondary,#e5e7eb);
+                                border-radius:999px;height:7px;overflow:hidden;">
+                        <div class="results-bar"
+                             style="width:{{ cand.pct }}%;"></div>
+                    </div>
+                </div>
+
+                <span class="text-xs text-muted"
+                      style="min-width:90px;text-align:right;">
+                    {{ "{:,}".format(cand.votes) }}
+                    <span style="color:var(--evs-text-faint);">
+                        ({{ cand.pct }}%)
+                    </span>
+                </span>
+            </div>
+            {% endfor %}
+
+            {% if con.total_con_votes == 0 %}
+            <div class="text-muted text-xs">No votes cast in this constituency yet.</div>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+
+        {% else %}
+        <div class="evs-alert evs-alert--info">
+            No PA results yet
+            {% if province_filter %} for the selected province{% endif %}.
+        </div>
+        {% endif %}
+        {% endif %}
+
+        {% endif %}{# end election check #}
+
+    </div><!-- evs-content -->
+</div><!-- evs-shell -->
+
+<!-- Auto-color script — same as parties.html -->
+<script>
+function abbrToColor(abbr) {
+    let hash = 0;
+    for (let i = 0; i < abbr.length; i++) {
+        hash = abbr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return 'hsl(' + hue + ', 55%, 38%)';
+}
+document.querySelectorAll('.party-badge-auto').forEach(function(el) {
+    el.style.background = abbrToColor(el.getAttribute('data-abbr'));
+    el.style.color = '#ffffff';
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PO Verify — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .po-pending-card {
+            background: #fff;
+            border: 1.5px solid var(--evs-green);
+            border-radius: var(--evs-radius-lg);
+            padding: 20px;
+        }
+        .po-idle-card {
+            background: #fff;
+            border: 0.5px solid var(--evs-border);
+            border-radius: var(--evs-radius-lg);
+            padding: 20px;
+            text-align: center;
+            color: var(--evs-text-muted);
+        }
+        .po-pulse {
+            display: inline-block;
+            width: 8px; height: 8px;
+            background: var(--evs-green);
+            border-radius: 50%;
+            animation: pulse 1.4s infinite;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%       { opacity: 0.4; transform: scale(0.7); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        PO Verification —
+        {% if station %}{{ station.station_name }}, {{ station.city_name }}{% endif %}
+    </div>
+    <div class="evs-header__right">
+        <span class="evs-badge evs-badge--info">
+            <span class="po-pulse"></span>Auto-refresh 2s
+        </span>
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-content" style="min-height:calc(100vh - 45px);">
+
+    <div class="evs-alert evs-alert--info mb-16" style="font-size:12px;">
+        When a voter submits their CNIC on the Voting Machine, their details appear below.
+        Visually verify the name and CNIC against the physical card — then Approve or Reject.
+    </div>
+
+    <!-- Stat cards -->
+    <div class="evs-grid-3 mb-16">
+        <div class="evs-stat-card">
+            <div class="evs-stat-card__number">{{ stats.voted_today or 0 }}</div>
+            <div class="evs-stat-card__label">Votes Cast Today</div>
+        </div>
+        <div class="evs-stat-card">
+            <div class="evs-stat-card__number" style="color:var(--evs-red);">
+                {{ stats.rejected_today or 0 }}
+            </div>
+            <div class="evs-stat-card__label">Rejected Today</div>
+        </div>
+        <div class="evs-stat-card">
+            <div class="evs-stat-card__number" id="pending-count">—</div>
+            <div class="evs-stat-card__label">Currently Pending</div>
+        </div>
+    </div>
+
+    <div class="evs-grid-2">
+
+        <!-- Left: Pending voter panel -->
+        <div>
+            <div class="evs-section-title">Pending Verification</div>
+
+            <!-- Idle state — shown when no pending voter -->
+            <div class="po-idle-card" id="idle-panel">
+                <div style="font-size:28px;margin-bottom:10px;">🕐</div>
+                <div class="fw-500" style="font-size:14px;margin-bottom:4px;">
+                    Waiting for next voter...
+                </div>
+                <div style="font-size:12px;">
+                    This panel updates automatically every 2 seconds.
+                </div>
+            </div>
+
+            <!-- Pending voter card — hidden until a voter arrives -->
+            <div class="po-pending-card" id="voter-panel" style="display:none;">
+
+                <div class="evs-alert evs-alert--warning" id="already-voted-warn"
+                     style="display:none;font-size:11px;">
+                    ⚠️ This voter has already voted — Reject immediately.
+                </div>
+
+                <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+                    <div class="evs-voter-card__avatar" id="voter-initials"
+                         style="width:52px;height:52px;font-size:17px;flex-shrink:0;">
+                        —
+                    </div>
+                    <div>
+                        <div class="fw-500" id="voter-name"
+                             style="font-size:16px;margin-bottom:2px;"></div>
+                        <div class="text-muted text-xs" id="voter-cnic"></div>
+                    </div>
+                </div>
+
+                <div class="evs-voter-card">
+                    <div class="evs-voter-card__row">
+                        <span class="evs-voter-card__label">Gender</span>
+                        <span id="voter-gender">—</span>
+                    </div>
+                    <div class="evs-voter-card__row">
+                        <span class="evs-voter-card__label">City</span>
+                        <span id="voter-city">—</span>
+                    </div>
+                    <div class="evs-voter-card__row">
+                        <span class="evs-voter-card__label">NA Constituency</span>
+                        <span id="voter-na">—</span>
+                    </div>
+                    <div class="evs-voter-card__row">
+                        <span class="evs-voter-card__label">PA Constituency</span>
+                        <span id="voter-pa">—</span>
+                    </div>
+                    <div class="evs-voter-card__row" style="border:none;">
+                        <span class="evs-voter-card__label">Voting Status</span>
+                        <span id="voter-status-badge"></span>
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:10px;margin-top:16px;">
+                    <button id="btn-approve"
+                            class="evs-btn evs-btn--primary"
+                            style="flex:1;padding:12px;font-size:14px;"
+                            onclick="doApprove()">
+                        ✓ Approve
+                    </button>
+                    <button id="btn-reject"
+                            class="evs-btn evs-btn--danger"
+                            style="flex:1;padding:12px;font-size:14px;"
+                            onclick="doReject()">
+                        ✗ Reject
+                    </button>
+                </div>
+            </div>
+
+            <!-- Possible states info -->
+            <div class="evs-card mt-12" style="font-size:11px;">
+                <div class="fw-500 mb-8 text-muted">Other states you may see:</div>
+                <div style="display:flex;flex-direction:column;gap:6px;color:var(--evs-text-muted);">
+                    <span>
+                        <span class="evs-badge evs-badge--danger">Already Voted</span>
+                        — reject immediately, voter cannot vote twice
+                    </span>
+                    <span>
+                        <span class="evs-badge evs-badge--warning">CNIC Not Found</span>
+                        — CNIC not in registered voters, shown on VM side
+                    </span>
+                    <span>When idle — Approve/Reject buttons are hidden</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Recent activity -->
+        <div>
+            <div class="evs-section-title">Recent Activity (this station)</div>
+            <div class="evs-log" id="recent-log">
+                {% if recent %}
+                    {% for r in recent %}
+                    <div class="evs-log__item">
+                        <span class="evs-log__time" style="width:42px;">
+                            {{ r.voted_at.strftime('%H:%M')
+                               if r.voted_at and r.voted_at.__class__.__name__ == 'datetime'
+                               else '—' }}
+                        </span>
+                        <div style="min-width:0;">
+                            <div class="fw-500 text-xs"
+                                 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                {{ r.full_name or r.voter_name or r.cnic }}
+                            </div>
+                            <div class="text-faint text-xs">
+                                {{ r.cnic }} —
+                                <span style="color: {{ '#27500a' if r.status == 'voted' else ('#a32d2d' if r.status == 'rejected' else '#0c447c')}};"> {{ r.status|capitalize }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-muted text-sm" style="padding:8px;">
+                        No activity yet today.
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="evs-card mt-12" style="font-size:11px;color:var(--evs-text-muted);">
+                You can only see voters from your assigned station.
+                You cannot view results, candidates, parties, or any other system data.
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+let currentCnic = null;
+let pollTimer   = null;
+
+function poll() {
+    fetch('{{ url_for("polling_officer.pending_voter") }}')
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('pending-count').textContent = d.pending ? '1' : '0';
+            if (d.pending) {
+                showVoter(d);
+            } else {
+                showIdle();
+            }
+        })
+        .catch(() => {});  // silent fail — next tick will retry
+}
+
+function showIdle() {
+    currentCnic = null;
+    document.getElementById('idle-panel').style.display  = 'block';
+    document.getElementById('voter-panel').style.display = 'none';
+}
+
+function showVoter(d) {
+    currentCnic = d.cnic;
+
+    // Initials
+    const initials = d.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    document.getElementById('voter-initials').textContent = initials;
+
+    document.getElementById('voter-name').textContent   = d.name;
+    document.getElementById('voter-cnic').textContent   = d.cnic;
+    document.getElementById('voter-gender').textContent = d.gender;
+    document.getElementById('voter-city').textContent   = d.city;
+    document.getElementById('voter-na').textContent     = d.na;
+    document.getElementById('voter-pa').textContent     = d.pa;
+
+    const warnEl  = document.getElementById('already-voted-warn');
+    const badgeEl = document.getElementById('voter-status-badge');
+    const approveBtn = document.getElementById('btn-approve');
+
+    if (d.has_voted) {
+        warnEl.style.display  = 'block';
+        badgeEl.innerHTML     = '<span class="evs-badge evs-badge--danger">Already Voted</span>';
+        approveBtn.disabled   = true;
+        approveBtn.style.opacity = '0.4';
+    } else {
+        warnEl.style.display  = 'none';
+        badgeEl.innerHTML     = '<span class="evs-badge evs-badge--success">Not Yet Voted</span>';
+        approveBtn.disabled   = false;
+        approveBtn.style.opacity = '1';
+    }
+
+    document.getElementById('idle-panel').style.display  = 'none';
+    document.getElementById('voter-panel').style.display = 'block';
+}
+
+function doApprove() {
+    if (!currentCnic) return;
+    fetch('/po/approve/' + encodeURIComponent(currentCnic), { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) showIdle();
+        });
+}
+
+function doReject() {
+    if (!currentCnic) return;
+    fetch('/po/reject/' + encodeURIComponent(currentCnic), { method: 'POST' })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) showIdle();
+        });
+}
+
+// Start polling immediately then every 2s
+poll();
+pollTimer = setInterval(poll, 2000);
+</script>
+
+</body>
+</html>

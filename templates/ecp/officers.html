@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Officers — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<!-- Header -->
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        EVS — ECP Central Control
+    </div>
+    <div class="evs-header__right">
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}"
+           class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-shell">
+
+    <!-- Sidebar -->
+    <div class="evs-sidebar">
+        <a href="{{ url_for('ecp.dashboard') }}" class="evs-sidebar__item">Dashboard</a>
+        <a href="{{ url_for('ecp.parties') }}" class="evs-sidebar__item">Parties</a>
+        <a href="{{ url_for('ecp.officers') }}" class="evs-sidebar__item active">Officers</a>
+        <a href="{{ url_for('ecp.results') }}" class="evs-sidebar__item">Results</a>
+        <a href="{{ url_for('ecp.audit_trail') }}" class="evs-sidebar__item">Audit Trail</a>
+        <a href="{{ url_for('ecp.login_logs') }}" class="evs-sidebar__item">Login Logs</a>
+    </div>
+
+    <div class="evs-content">
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                {% if category == 'password' %}
+                <div class="evs-alert evs-alert--password">
+                    🔑 {{ message }}
+                </div>
+                {% else %}
+                <div class="evs-alert evs-alert--{{ 'success' if category == 'success' else 'danger' }}">
+                    {{ message }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        {% endwith %}
+
+        <div class="evs-section-title">Provincial Officers</div>
+
+        <!-- ── SECTION 1: Province Cards ───────────────────────────── -->
+        <div class="evs-grid-4 mb-16">
+            {% for card in province_cards %}
+            <div class="officer-province-card"
+                 {% if card.officer_id %}
+                 onclick="openDetail( {{ card.officer_id }} )"
+                 style="cursor:pointer;"
+                 {% endif %}>
+
+                <div class="officer-province-card__header">
+                    <span class="officer-province-card__province">{{ card.province_name }}</span>
+                    {% if card.officer_id %}
+                        {% if card.is_active %}
+                        <span class="evs-badge evs-badge--success">Active</span>
+                        {% else %}
+                        <span class="evs-badge evs-badge--danger">Inactive</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="evs-badge evs-badge--warning">No Officer</span>
+                    {% endif %}
+                </div>
+
+                <div class="officer-province-card__name">
+                    {{ card.officer_name or '— Unassigned —' }}
+                </div>
+
+                {% if card.officer_id %}
+                <div class="officer-province-card__stats">
+                    <div class="officer-stat">
+                        <div class="officer-stat__num">{{ card.voters }}</div>
+                        <div class="officer-stat__lbl">Voters</div>
+                    </div>
+                    <div class="officer-stat">
+                        <div class="officer-stat__num">{{ card.candidates }}</div>
+                        <div class="officer-stat__lbl">Candidates</div>
+                    </div>
+                    <div class="officer-stat">
+                        <div class="officer-stat__num">{{ card.stations }}</div>
+                        <div class="officer-stat__lbl">Stations</div>
+                    </div>
+                </div>
+                <div class="officer-province-card__last">
+                    {% if card.last_action %}
+                        Last action: {{ card.last_action.performed_at.strftime('%d %b, %H:%M')
+                            if card.last_action.performed_at.__class__.__name__ == 'datetime'
+                            else card.last_action.performed_at }}
+                    {% elif card.last_login %}
+                        Last login: {{ card.last_login.strftime('%d %b, %H:%M')
+                            if card.last_login.__class__.__name__ == 'datetime'
+                            else card.last_login }}
+                    {% else %}
+                        No activity yet
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="officer-province-card__last">Click Add Officer below to assign</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="evs-grid-2">
+
+            <!-- ── SECTION 2: Add Officer Form ──────────────────────── -->
+            <div class="evs-card">
+                <div class="fw-500 mb-12">Add Provincial Officer</div>
+
+                {% if available_provinces %}
+                <form method="POST" action="{{ url_for('ecp.add_officer') }}">
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Full Name</label>
+                        <input type="text" name="full_name" class="evs-input"
+                               placeholder="e.g. Khalid Nawaz" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Username</label>
+                        <input type="text" name="username" class="evs-input"
+                            placeholder="e.g. punjab.officer1" required>
+                    </div>
+
+                    <!-- email -->
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Email</label>
+                        <input type="email" name="email" class="evs-input"
+                            placeholder="e.g. khalid@ecp.gov.pk" required>
+                    </div>
+
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Province</label>
+                        <select name="province_id" class="evs-input" required>
+                            <option value="">— Select Province —</option>
+                            {% for prov in available_provinces %}
+                            <option value="{{ prov.province_id }}">{{ prov.province_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Password</label>
+                        <input type="password" name="password" class="evs-input"
+                               placeholder="Min 8 characters" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Confirm Password</label>
+                        <input type="password" name="confirm_password" class="evs-input"
+                               placeholder="Repeat password" required>
+                    </div>
+                
+                    <button type="submit" class="evs-btn evs-btn--primary evs-btn--full">
+                        Add Officer
+                    </button>
+                </form>
+                {% else %}
+                <div class="evs-alert evs-alert--info">
+                    All 4 provinces already have active officers assigned.
+                    Deactivate or delete an existing officer to reassign a province.
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- ── SECTION 4: Activity Feed ──────────────────────────── -->
+            <div class="evs-card">
+                <div class="fw-500 mb-12">Recent Officer Activity</div>
+                {% if activity_feed %}
+                <div class="evs-log">
+                    {% for log in activity_feed %}
+                    <div class="evs-log__item">
+                        <span class="evs-log__time">
+                            {{ log.performed_at.strftime('%H:%M')
+                               if log.performed_at.__class__.__name__ == 'datetime'
+                               else log.performed_at }}
+                        </span>
+                        <div>
+                            <div class="fw-500 text-xs">{{ log.performed_by }}</div>
+                            <div class="text-muted text-xs">{{ log.action }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-muted text-sm">No officer activity recorded yet.</div>
+                {% endif %}
+            </div>
+
+        </div>
+
+        <!-- ── SECTION 3: Officers Table ────────────────────────────── -->
+        <div class="evs-card mt-16">
+            <div class="fw-500 mb-12">All Officers ({{ all_officers|length }})</div>
+            {% if all_officers %}
+            <div style="overflow-x:auto;">
+                <table class="evs-table">
+                    <thead>
+                        <tr>
+                            <th>Full Name</th>
+                            <th>Username</th>
+                            <th>Province</th>
+                            <th>Last Login</th>
+                            <th style="width:90px;">Status</th>
+                            <th style="width:220px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for officer in all_officers %}
+                        <tr>
+                            <td class="fw-500">{{ officer.full_name }}</td>
+                            <td class="text-muted text-xs">{{ officer.username }}</td>
+                            <td>{{ officer.province_name }}</td>
+                            <td class="text-muted text-xs">
+                                {% if officer.last_login %}
+                                    {{ officer.last_login.strftime('%d %b %Y, %H:%M')
+                                       if officer.last_login.__class__.__name__ == 'datetime'
+                                       else officer.last_login }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if officer.is_active %}
+                                <span class="evs-badge evs-badge--success">Active</span>
+                                {% else %}
+                                <span class="evs-badge evs-badge--danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <!-- Detail -->
+                                <button class="evs-btn evs-btn--outline evs-btn--sm"
+                                        onclick="openDetail({{ officer.officer_id }})">
+                                    Detail
+                                </button>
+
+                                <!-- Toggle Active/Inactive -->
+                                <form method="POST"
+                                      action="{{ url_for('ecp.toggle_officer', officer_id=officer.officer_id) }}"
+                                      style="display:inline;">
+                                    <button type="submit"
+                                            class="evs-btn evs-btn--sm
+                                            {{ 'evs-btn--warning' if officer.is_active else 'evs-btn--primary' }}"
+                                            onclick="return confirm('{{ 'Deactivate' if officer.is_active else 'Activate' }} {{ officer.full_name }}?')">
+                                        {{ 'Deactivate' if officer.is_active else 'Activate' }}
+                                    </button>
+                                </form>
+
+                                <!-- Reset Password -->
+                                <form method="POST"
+                                      action="{{ url_for('ecp.reset_officer_password', officer_id=officer.officer_id) }}"
+                                      style="display:inline;">
+                                    <button type="submit"
+                                            class="evs-btn evs-btn--gold evs-btn--sm"
+                                            onclick="return confirm('Reset password for {{ officer.full_name }}? A new password will be shown once.')">
+                                        Reset PW
+                                    </button>
+                                </form>
+
+                                <!-- Delete -->
+                                <form method="POST"
+                                      action="{{ url_for('ecp.delete_officer', officer_id=officer.officer_id) }}"
+                                      style="display:inline;">
+                                    <button type="submit"
+                                            class="evs-btn evs-btn--danger evs-btn--sm"
+                                            onclick="return confirm('Delete {{ officer.full_name }}? This is permanent.')">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-muted text-sm">No officers added yet.</div>
+            {% endif %}
+        </div>
+
+    </div><!-- end evs-content -->
+</div><!-- end evs-shell -->
+
+<!-- ── Officer Detail Modal ─────────────────────────────────────────────── -->
+<div id="detail-overlay" class="officer-modal-overlay" onclick="closeDetail()">
+    <div class="officer-modal" onclick="event.stopPropagation()">
+        <div class="officer-modal__header">
+            <div>
+                <div class="fw-500" id="modal-name" style="font-size:15px;"></div>
+                <div class="text-muted text-xs" id="modal-meta"></div>
+            </div>
+            <button class="evs-btn evs-btn--outline evs-btn--sm"
+                    onclick="closeDetail()">✕ Close</button>
+        </div>
+
+        <div class="evs-grid-3 mt-12" id="modal-stats"></div>
+
+        <div class="evs-section-title mt-12">Recent Activity</div>
+        <div class="evs-log" id="modal-activity"></div>
+    </div>
+</div>
+
+<script>
+function openDetail(officerId) {
+    fetch('/ecp/officers/' + officerId + '/detail')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            document.getElementById('modal-name').textContent =
+                d.full_name + ' — ' + d.province_name;
+            document.getElementById('modal-meta').textContent =
+                '@' + d.username +
+                ' | Added: ' + d.created_at +
+                ' | Last login: ' + d.last_login +
+                ' | ' + (d.is_active ? 'Active' : 'Inactive');
+
+            document.getElementById('modal-stats').innerHTML =
+                stat('Voters Registered', d.voters) +
+                stat('Candidates Added', d.candidates) +
+                stat('Stations Created', d.stations);
+
+            var actHtml = '';
+            if (d.activity.length === 0) {
+                actHtml = '<div class="text-muted text-sm" style="padding:8px;">No activity yet.</div>';
+            } else {
+                d.activity.forEach(function(a) {
+                    actHtml +=
+                        '<div class="evs-log__item">' +
+                        '<span class="evs-log__time" style="width:110px;font-size:10px;">' +
+                            a.performed_at + '</span>' +
+                        '<span class="text-xs">' + a.action + '</span>' +
+                        '</div>';
+                });
+            }
+            document.getElementById('modal-activity').innerHTML = actHtml;
+            document.getElementById('detail-overlay').classList.add('active');
+        });
+}
+
+function stat(label, value) {
+    return '<div class="evs-stat-card">' +
+               '<div class="evs-stat-card__number">' + value + '</div>' +
+               '<div class="evs-stat-card__label">' + label + '</div>' +
+           '</div>';
+}
+
+function closeDetail() {
+    document.getElementById('detail-overlay').classList.remove('active');
+}
+</script>
+
+</body>
+</html>

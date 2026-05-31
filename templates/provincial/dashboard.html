@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard — {{ province_name }} — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        EVS — {{ province_name }} Province
+    </div>
+    <div class="evs-header__right">
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-shell">
+    <div class="evs-sidebar">
+        <a href="{{ url_for('provincial.dashboard') }}"       class="evs-sidebar__item active">Dashboard</a>
+        <a href="{{ url_for('provincial.candidates') }}"      class="evs-sidebar__item">Candidates</a>
+        <a href="{{ url_for('provincial.voters') }}"          class="evs-sidebar__item">Voters</a>
+        <a href="{{ url_for('provincial.stations') }}"        class="evs-sidebar__item">Polling Stations</a>
+        <a href="{{ url_for('provincial.polling_officers') }}" class="evs-sidebar__item">Polling Officers</a>
+    </div>
+
+    <div class="evs-content">
+
+        <div class="mb-16">
+            <div class="fw-500" style="font-size:16px;">Welcome, {{ username }}</div>
+            <div class="text-muted text-sm">Provincial Officer — <strong>{{ province_name }}</strong></div>
+        </div>
+
+        <div class="evs-alert evs-alert--info mb-16">
+            Your access is restricted to <strong>{{ province_name }}</strong> only.
+            All data you manage is scoped to this province — you cannot view or modify other provinces.
+        </div>
+
+        <div class="evs-grid-4">
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ "{:,}".format(total_voters) }}</div>
+                <div class="evs-stat-card__label">Registered Voters</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_candidates }}</div>
+                <div class="evs-stat-card__label">Candidates</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_stations }}</div>
+                <div class="evs-stat-card__label">Polling Stations</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_po }}</div>
+                <div class="evs-stat-card__label">Polling Officers</div>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+            <a href="{{ url_for('provincial.candidates') }}"      class="evs-btn evs-btn--primary">Manage Candidates</a>
+            <a href="{{ url_for('provincial.voters') }}"          class="evs-btn evs-btn--primary">Manage Voters</a>
+            <a href="{{ url_for('provincial.stations') }}"        class="evs-btn evs-btn--primary">Polling Stations</a>
+            <a href="{{ url_for('provincial.polling_officers') }}" class="evs-btn evs-btn--primary">Polling Officers</a>
+        </div>
+
+        <div class="evs-section-title">My Recent Actions</div>
+        <div class="evs-log">
+            {% if audit_logs %}
+                {% for log in audit_logs %}
+                <div class="evs-log__item">
+                    <span class="evs-log__time">
+                        {{ log.performed_at.strftime('%H:%M')
+                           if log.performed_at.__class__.__name__ == 'datetime'
+                           else log.performed_at }}
+                    </span>
+                    <span class="text-muted text-xs">{{ log.action }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-muted text-sm" style="padding:8px;">No actions recorded yet.</div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>

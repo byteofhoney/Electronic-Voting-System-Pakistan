@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Polling Officers — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        EVS — Provincial Officer
+    </div>
+    <div class="evs-header__right">
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-shell">
+
+    <div class="evs-sidebar">
+        <a href="{{ url_for('provincial.dashboard') }}"        class="evs-sidebar__item">Dashboard</a>
+        <a href="{{ url_for('provincial.candidates') }}"       class="evs-sidebar__item">Candidates</a>
+        <a href="{{ url_for('provincial.voters') }}"           class="evs-sidebar__item">Voters</a>
+        <a href="{{ url_for('provincial.stations') }}"         class="evs-sidebar__item">Polling Stations</a>
+        <a href="{{ url_for('provincial.polling_officers') }}"  class="evs-sidebar__item active">Polling Officers</a>
+    </div>
+
+    <div class="evs-content">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                {% if category == 'password' %}
+                <div class="evs-alert evs-alert--password">
+                    🔑 {{ message }}
+                </div>
+                {% else %}
+                <div class="evs-alert evs-alert--{{ 'success' if category == 'success' else 'danger' }}">
+                    {{ message }}
+                </div>
+                {% endif %}
+            {% endfor %}
+        {% endwith %}
+
+        <div class="evs-grid-2">
+
+            <!-- Add Officer Form -->
+            <div class="evs-card">
+                <div class="fw-500 mb-12">Add Polling Officer</div>
+
+                {% if available_stations %}
+                <form method="POST" action="{{ url_for('provincial.add_polling_officer') }}">
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Full Name</label>
+                        <input type="text" name="full_name" class="evs-input"
+                               placeholder="e.g. Abdul Karim" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Username</label>
+                        <input type="text" name="username" class="evs-input"
+                               placeholder="e.g. akarim01" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Assign to Station</label>
+                        <select name="station_id" class="evs-input" required>
+                            <option value="">— Select Station —</option>
+                            {% for s in available_stations %}
+                            <option value="{{ s.station_id }}">
+                                {{ s.station_name }} — {{ s.city_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Password</label>
+                        <input type="password" name="password" class="evs-input"
+                               placeholder="Min 8 characters" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Confirm Password</label>
+                        <input type="password" name="confirm_password" class="evs-input"
+                               placeholder="Repeat password" required>
+                    </div>
+                    <div class="evs-alert evs-alert--info" style="font-size:11px;margin-bottom:12px;">
+                        Only stations without an active officer are listed.
+                        Each station can have only one active officer at a time.
+                    </div>
+                    <button type="submit" class="evs-btn evs-btn--primary evs-btn--full">
+                        Add Polling Officer
+                    </button>
+                </form>
+
+                {% else %}
+                <div class="evs-alert evs-alert--warning">
+                    All stations already have active officers assigned, or no stations have been
+                    created yet. Add a new station first, or deactivate an existing officer
+                    to free up a station.
+                </div>
+                <a href="{{ url_for('provincial.stations') }}"
+                   class="evs-btn evs-btn--outline evs-btn--sm">
+                    Go to Polling Stations →
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Summary Info -->
+            <div class="evs-card">
+                <div class="fw-500 mb-12">Summary</div>
+                <div class="evs-grid-2" style="margin-bottom:14px;">
+                    <div class="evs-stat-card">
+                        <div class="evs-stat-card__number">{{ polling_officers|length }}</div>
+                        <div class="evs-stat-card__label">Total Officers</div>
+                    </div>
+                    <div class="evs-stat-card">
+                        <div class="evs-stat-card__number" style="color:#27500a;">
+                            {{ polling_officers|selectattr('is_active')|list|length }}
+                        </div>
+                        <div class="evs-stat-card__label">Active</div>
+                    </div>
+                </div>
+                <div class="evs-alert evs-alert--info" style="font-size:11px;">
+                    Polling Officers can only access the voter verification screen for
+                    their assigned station. They cannot view candidates, parties, results,
+                    or any other system data.
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Officers Table -->
+        <div class="evs-card mt-16">
+            <div class="fw-500 mb-12">
+                All Polling Officers
+                <span class="text-muted text-xs">({{ polling_officers|length }})</span>
+            </div>
+
+            {% if polling_officers %}
+            <div style="overflow-x:auto;">
+                <table class="evs-table">
+                    <thead>
+                        <tr>
+                            <th style="width:20%;">Full Name</th>
+                            <th style="width:15%;">Username</th>
+                            <th style="width:30%;">Assigned Station</th>
+                            <th style="width:15%;">Last Login</th>
+                            <th style="width:8%;">Status</th>
+                            <th style="width:12%;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for po in polling_officers %}
+                        <tr>
+                            <td class="fw-500">{{ po.full_name }}</td>
+                            <td class="text-xs text-muted">{{ po.username }}</td>
+                            <td>{{ po.station_name }}</td>
+                            <td class="text-xs text-muted">
+                                {% if po.last_login %}
+                                    {{ po.last_login.strftime('%d %b %Y, %H:%M')
+                                       if po.last_login.__class__.__name__ == 'datetime'
+                                       else po.last_login }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if po.is_active %}
+                                <span class="evs-badge evs-badge--success">Active</span>
+                                {% else %}
+                                <span class="evs-badge evs-badge--danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td style="white-space:nowrap;">
+                                <!-- Toggle Active/Inactive -->
+                                <form method="POST"
+                                      action="{{ url_for('provincial.toggle_polling_officer', po_id=po.po_id) }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('{{ 'Deactivate' if po.is_active else 'Activate' }} {{ po.full_name }}?')">
+                                    <button type="submit"
+                                            class="evs-btn evs-btn--sm
+                                            {{ 'evs-btn--warning' if po.is_active else 'evs-btn--primary' }}">
+                                        {{ 'Deactivate' if po.is_active else 'Activate' }}
+                                    </button>
+                                </form>
+
+                                <!-- Reset Password -->
+                                <form method="POST"
+                                      action="{{ url_for('provincial.reset_po_password', po_id=po.po_id) }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Reset password for {{ po.full_name }}?')">
+                                    <button type="submit" class="evs-btn evs-btn--gold evs-btn--sm">
+                                        Reset PW
+                                    </button>
+                                </form>
+
+                                <!-- Delete -->
+                                <form method="POST"
+                                      action="{{ url_for('provincial.delete_polling_officer', po_id=po.po_id) }}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('Delete {{ po.full_name }}? This is permanent.')">
+                                    <button type="submit" class="evs-btn evs-btn--danger evs-btn--sm">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-muted text-sm" style="padding:8px 0;">No polling officers added yet.</div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+</body>
+</html>

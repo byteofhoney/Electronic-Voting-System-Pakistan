@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECP Dashboard — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<!-- Header -->
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        EVS — ECP Central Control
+    </div>
+    <div class="evs-header__right">
+        {% if election %}
+        <span class="evs-badge
+            {% if election.status == 'Active' %}evs-badge--success
+            {% elif election.status == 'Upcoming' %}evs-badge--warning
+            {% else %}evs-badge--danger{% endif %}">
+            Election: {{ election.status }}
+        </span>
+        {% endif %}
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}"
+           class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-shell">
+
+    <!-- Sidebar -->
+    <div class="evs-sidebar">
+        <a href="{{ url_for('ecp.dashboard') }}"   class="evs-sidebar__item active">Dashboard</a>
+        <a href="{{ url_for('ecp.parties') }}"     class="evs-sidebar__item">Parties</a>
+        <a href="{{ url_for('ecp.officers') }}"    class="evs-sidebar__item">Officers</a>
+        <a href="{{ url_for('ecp.results') }}"     class="evs-sidebar__item">Results</a>
+        <a href="{{ url_for('ecp.audit_trail') }}" class="evs-sidebar__item">Audit Trail</a>
+        <a href="{{ url_for('ecp.login_logs') }}"  class="evs-sidebar__item">Login Logs</a>
+    </div>
+
+    <div class="evs-content">
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="evs-alert evs-alert--{{ 'success' if category == 'success' else 'danger' }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endwith %}
+
+        <div class="mb-16">
+            <div class="fw-500" style="font-size:16px;">Welcome, {{ username }}</div>
+            <div class="text-muted text-sm">
+                Election Commission of Pakistan — Central Control
+            </div>
+        </div>
+
+        <!-- ── Stat Cards ──────────────────────────────────────── -->
+        <div class="evs-grid-4 mb-16">
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">
+                    {{ "{:,}".format(total_voters) }}
+                </div>
+                <div class="evs-stat-card__label">Registered Voters</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_candidates }}</div>
+                <div class="evs-stat-card__label">Candidates</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_stations }}</div>
+                <div class="evs-stat-card__label">Polling Stations</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number text-green"
+                     style="font-size:15px;">
+                    {% if election %}{{ election.status }}{% else %}None{% endif %}
+                </div>
+                <div class="evs-stat-card__label">Election Status</div>
+            </div>
+        </div>
+
+        <!-- ── Election Management Panel ───────────────────────── -->
+        <div class="evs-card mb-16">
+
+            {% if not election %}
+            <!-- No election — show create form -->
+            <div class="evs-section-title">Create Election</div>
+            <div class="evs-alert evs-alert--info mb-16">
+                No election exists yet. Fill in the details below to schedule one.
+                The election will start and end automatically based on the times you set.
+            </div>
+
+            <form method="POST" action="{{ url_for('ecp.create_election') }}">
+                <div class="evs-grid-2">
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Election Name</label>
+                        <input type="text" name="election_name" class="evs-input"
+                               placeholder="e.g. General Election 2024"
+                               required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Election Date</label>
+                        <input type="date" name="election_date" class="evs-input"
+                               required>
+                    </div>
+                </div>
+                <div class="evs-grid-2">
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Start Time</label>
+                        <input type="time" name="start_time" class="evs-input"
+                               required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">End Time</label>
+                        <input type="time" name="end_time" class="evs-input"
+                               required>
+                    </div>
+                </div>
+                <div class="evs-alert evs-alert--warning"
+                     style="font-size:11px;margin-bottom:12px;">
+                    For a test election: set today's date, start time a few
+                    minutes from now, end time 15 minutes after that.
+                    The system will auto-activate and auto-close at those exact times.
+                </div>
+                <button type="submit" class="evs-btn evs-btn--primary">
+                    Create Election
+                </button>
+            </form>
+
+            {% elif election.status == 'Closed' %}
+            <!-- Closed — show summary + create new option -->
+            <div class="evs-section-title">Election Closed</div>
+            <div class="evs-alert evs-alert--info mb-16">
+                <strong>{{ election.election_name }}</strong> has ended.
+                You can now view final results or create a new election.
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+                <a href="{{ url_for('ecp.results') }}"
+                   class="evs-btn evs-btn--primary">
+                    View Final Results
+                </a>
+            </div>
+
+            <!-- Create new election form (collapsed by default) -->
+            <button class="evs-btn evs-btn--outline evs-btn--sm"
+                    onclick="toggleNewForm()">
+                + Create New Election
+            </button>
+            <div id="new-election-form" style="display:none;margin-top:16px;">
+                <form method="POST" action="{{ url_for('ecp.create_election') }}">
+                    <div class="evs-grid-2">
+                        <div class="evs-form-group">
+                            <label class="evs-form-label">Election Name</label>
+                            <input type="text" name="election_name"
+                                   class="evs-input"
+                                   placeholder="e.g. By-Election 2025" required>
+                        </div>
+                        <div class="evs-form-group">
+                            <label class="evs-form-label">Election Date</label>
+                            <input type="date" name="election_date"
+                                   class="evs-input" required>
+                        </div>
+                    </div>
+                    <div class="evs-grid-2">
+                        <div class="evs-form-group">
+                            <label class="evs-form-label">Start Time</label>
+                            <input type="time" name="start_time"
+                                   class="evs-input" required>
+                        </div>
+                        <div class="evs-form-group">
+                            <label class="evs-form-label">End Time</label>
+                            <input type="time" name="end_time"
+                                   class="evs-input" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="evs-btn evs-btn--primary">
+                        Create Election
+                    </button>
+                </form>
+            </div>
+
+            {% else %}
+            <!-- Active or Upcoming — show live panel -->
+            <div style="display:flex;align-items:center;
+                        justify-content:space-between;
+                        flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+                <div class="evs-section-title" style="margin:0;border:none;">
+                    {{ election.election_name }}
+                </div>
+                <span class="evs-badge
+                    {% if election.status == 'Active' %}evs-badge--success
+                    {% else %}evs-badge--warning{% endif %}"
+                      style="font-size:12px;padding:4px 10px;">
+                    {{ election.status }}
+                </span>
+            </div>
+
+            <!-- Schedule info -->
+            {% if schedule %}
+            <div style="display:flex;gap:20px;margin-bottom:14px;
+                        flex-wrap:wrap;font-size:12px;">
+                <div>
+                    <span class="text-muted">Date</span>&nbsp;
+                    <strong>
+                        {{ election.election_date.strftime('%d %b %Y')
+                           if election.election_date.__class__.__name__ == 'date'
+                           else election.election_date }}
+                    </strong>
+                </div>
+                <div>
+                    <span class="text-muted">Opens</span>&nbsp;
+                    <strong>{{ start_iso[11:16] if start_iso else '—' }}</strong>
+                </div>
+                <div>
+                    <span class="text-muted">Closes</span>&nbsp;
+                    <strong>{{ end_iso[11:16] if end_iso else '—' }}</strong>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Countdown timer -->
+            <div class="election-countdown" id="countdown-box">
+                <div class="ec-label" id="countdown-label">
+                    {% if election.status == 'Upcoming' %}
+                        Election starts in
+                    {% else %}
+                        Election closes in
+                    {% endif %}
+                </div>
+                <div class="ec-timer" id="countdown-timer">—</div>
+                <div class="ec-note" id="countdown-note"></div>
+            </div>
+
+            <!-- Manual close button -->
+            {% if election.status == 'Active' %}
+            <div style="margin-top:14px;">
+                <form method="POST"
+                      action="{{ url_for('ecp.close_election') }}"
+                      onsubmit="return confirm(
+                          'Manually close the election now?\n\n'
+                          + 'This will stop all voting immediately '
+                          + 'and cannot be undone.')">
+                    <button type="submit" class="evs-btn evs-btn--danger">
+                        Close Election Now
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
+            {% if election.status == 'Upcoming' %}
+            <div style="margin-top:14px;">
+                <form method="POST"
+                      action="{{ url_for('ecp.close_election') }}"
+                      onsubmit="return confirm('Cancel this upcoming election?')">
+                    <button type="submit" class="evs-btn evs-btn--danger">
+                        Cancel Election
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
+            {% endif %}
+        </div>
+
+            <!-- ── Quick Actions ────────────────────────────────── -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+            <a href="{{ url_for('ecp.islamabad') }}"
+            class="evs-btn evs-btn--gold">🏛   Manage Islamabad (ICT)</a>
+        </div>
+
+        
+        <!-- ── Recent Audit Log ──────────────────────────────── -->
+        <div class="evs-section-title">Recent System Activity</div>
+        <div class="evs-log">
+            {% if audit_logs %}
+                {% for log in audit_logs %}
+                <div class="evs-log__item">
+                    <span class="evs-log__time">
+                        {{ log.performed_at.strftime('%H:%M')
+                           if log.performed_at.__class__.__name__ == 'datetime'
+                           else log.performed_at }}
+                    </span>
+                    <div>
+                        <span class="fw-500 text-xs">{{ log.performed_by }}</span>
+                        <span class="text-muted text-xs"> — {{ log.action }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-muted text-sm" style="padding:8px;">
+                    No recent actions recorded.
+                </div>
+            {% endif %}
+        </div>
+
+    </div><!-- evs-content -->
+</div><!-- evs-shell -->
+
+<style>
+/* ── Election countdown widget ─────────────────────────── */
+.election-countdown {
+    background: var(--evs-surface-alt, #f6faf6);
+    border: 0.5px solid var(--evs-border);
+    border-radius: var(--evs-radius-md);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+}
+
+.ec-label {
+    font-size: 11px;
+    color: var(--evs-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.ec-timer {
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--evs-green);
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+}
+
+.ec-timer.urgent { color: #a32d2d; }
+
+.ec-note {
+    font-size: 11px;
+    color: var(--evs-text-faint);
+}
+</style>
+
+<script>
+// ── Countdown timer ─────────────────────────────────────
+const startISO = {{ start_iso | tojson }};
+const endISO   = {{ end_iso   | tojson }};
+const status   = {{ (election.status if election else 'None') | tojson }};
+
+function parseLocal(isoStr) {
+    // Parse as local time (no timezone suffix)
+    if (!isoStr) return null;
+    const [datePart, timePart] = isoStr.split('T');
+    const [y, mo, d] = datePart.split('-').map(Number);
+    const [h, mi, s] = timePart.split(':').map(Number);
+    return new Date(y, mo - 1, d, h, mi, s);
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function formatCountdown(ms) {
+    if (ms <= 0) return '00:00:00';
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return pad(h) + ':' + pad(m) + ':' + pad(s);
+}
+
+function tick() {
+    const timerEl = document.getElementById('countdown-timer');
+    const labelEl = document.getElementById('countdown-label');
+    const noteEl  = document.getElementById('countdown-note');
+
+    if (!timerEl) return;
+
+    // No election or closed — stop
+    if (!startISO || !endISO ||
+        status === 'Closed' || status === 'None' || status === null) {
+        return;
+    }
+
+    const now      = new Date();
+    const startDt  = parseLocal(startISO);
+    const endDt    = parseLocal(endISO);
+
+    if (status === 'Upcoming') {
+        const msLeft = startDt - now;
+        if (msLeft <= 0) {
+            // Time to start — reload so Flask syncs DB status
+            timerEl.textContent = 'Starting...';
+            setTimeout(() => location.reload(), 1500);
+            return;
+        }
+        labelEl.textContent   = 'Election starts in';
+        timerEl.textContent   = formatCountdown(msLeft);
+        timerEl.className     = 'ec-timer';
+        noteEl.textContent    = 'Opens at ' + startISO.slice(11, 16);
+
+    } else if (status === 'Active') {
+        const msLeft = endDt - now;
+        if (msLeft <= 0) {
+            // Time to close — reload so Flask syncs DB status
+            timerEl.textContent = 'Closing...';
+            setTimeout(() => location.reload(), 1500);
+            return;
+        }
+        labelEl.textContent = 'Election closes in';
+        timerEl.textContent = formatCountdown(msLeft);
+        timerEl.className   = 'ec-timer' + (msLeft < 300000 ? ' urgent' : '');
+        noteEl.textContent  = 'Closes at ' + endISO.slice(11, 16);
+    }
+
+    setTimeout(tick, 1000);
+}
+
+// Start ticking on page load
+tick();
+
+// Auto-reload dashboard every 60s so status syncs even if tab is left open
+setInterval(function() {
+    if (status === 'Upcoming' || status === 'Active') {
+        location.reload();
+    }
+}, 60000);
+
+function toggleNewForm() {
+    const f = document.getElementById('new-election-form');
+    f.style.display = f.style.display === 'none' ? '' : 'none';
+}
+</script>
+
+</body>
+</html>

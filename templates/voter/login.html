@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vote — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="evs-full-screen">
+
+    <div class="evs-voter-topbar">
+        <div class="evs-voter-topbar__brand">☪ الیکٹرانک ووٹنگ سسٹم</div>
+        <div class="evs-voter-topbar__station">Voting Machine</div>
+    </div>
+
+    <div class="evs-full-screen__body">
+        <div class="evs-login-card">
+
+            <div class="evs-login-card__logo">
+                <div class="evs-login-card__icon">☪</div>
+                <div class="evs-login-card__title">Enter Your Details to Vote</div>
+                <div class="evs-login-card__subtitle">
+                    Your identity will be verified by the Polling Officer
+                    before the ballot appears
+                </div>
+            </div>
+
+            {% if error %}
+            <div class="evs-alert evs-alert--danger">{{ error }}</div>
+            {% endif %}
+
+            <form method="POST"
+                  action="{{ url_for('voter.vote_login', station_id=station_id) }}">
+                <input type="hidden" name="station_id" value="{{ station_id }}">
+
+                <div class="evs-form-group">
+                    <label class="evs-form-label">Full Name</label>
+                    <input type="text" name="full_name" class="evs-input"
+                           placeholder="As on your CNIC" required
+                           style="font-size:14px;padding:10px;">
+                </div>
+
+                <div class="evs-form-group">
+                    <label class="evs-form-label">CNIC Number</label>
+                    <input type="text" name="cnic" class="evs-input"
+                           placeholder="XXXXX-XXXXXXX-X"
+                           pattern="\d{5}-\d{7}-\d{1}"
+                           title="Format: XXXXX-XXXXXXX-X"
+                           required
+                           style="font-size:15px;padding:10px;letter-spacing:1px;">
+                </div>
+
+                <div style="font-size:11px;color:var(--evs-text-muted);margin-bottom:14px;">
+                    Example: 35202-1234567-1 &nbsp;|&nbsp; Include dashes
+                </div>
+
+                <button type="submit"
+                        class="evs-btn evs-btn--primary evs-btn--full"
+                        style="padding:12px;font-size:14px;">
+                    Submit — Proceed to Verification
+                </button>
+            </form>
+
+        </div>
+    </div>
+
+    <div class="evs-full-screen__footer">
+        Electronic Voting System — Election Commission of Pakistan &nbsp;|&nbsp;
+        Secure &amp; Confidential
+    </div>
+
+</div>
+
+</body>
+</html>

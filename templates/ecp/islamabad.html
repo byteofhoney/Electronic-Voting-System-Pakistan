@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Islamabad — ECP Direct Control — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        EVS — Islamabad Capital Territory
+    </div>
+    <div class="evs-header__right">
+        <span class="evs-badge evs-badge--info">ECP Direct Control</span>
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-shell">
+
+    <div class="evs-sidebar">
+        <a href="{{ url_for('ecp.dashboard') }}"   class="evs-sidebar__item">Dashboard</a>
+        <a href="{{ url_for('ecp.parties') }}"     class="evs-sidebar__item">Parties</a>
+        <a href="{{ url_for('ecp.officers') }}"    class="evs-sidebar__item">Officers</a>
+        <a href="{{ url_for('ecp.results') }}"     class="evs-sidebar__item">Results</a>
+        <a href="{{ url_for('ecp.audit_trail') }}" class="evs-sidebar__item">Audit Trail</a>
+        <a href="{{ url_for('ecp.login_logs') }}"  class="evs-sidebar__item">Login Logs</a>
+    </div>
+
+    <div class="evs-content">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="evs-alert evs-alert--{{ 'success' if category == 'success' else ('password' if category == 'password' else 'danger') }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endwith %}
+
+        <div class="mb-16">
+            <div class="fw-500" style="font-size:16px;">Islamabad Capital Territory</div>
+            <div class="text-muted text-sm">
+                Federal territory — managed directly by ECP. No Provincial Officer.
+            </div>
+        </div>
+
+        <!-- Stat Cards -->
+        <div class="evs-grid-4 mb-16">
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_voters }}</div>
+                <div class="evs-stat-card__label">Registered Voters</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_candidates }}</div>
+                <div class="evs-stat-card__label">Candidates</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_stations }}</div>
+                <div class="evs-stat-card__label">Polling Stations</div>
+            </div>
+            <div class="evs-stat-card">
+                <div class="evs-stat-card__number">{{ total_po }}</div>
+                <div class="evs-stat-card__label">Polling Officers</div>
+            </div>
+        </div>
+
+        <!-- Nav Tabs -->
+        <div style="display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap;">
+            <a href="#stations"   class="evs-btn evs-btn--outline evs-btn--sm">Polling Stations</a>
+            <a href="#officers"   class="evs-btn evs-btn--outline evs-btn--sm">Polling Officers</a>
+            <a href="#candidates" class="evs-btn evs-btn--outline evs-btn--sm">Candidates</a>
+            <a href="#voters"     class="evs-btn evs-btn--outline evs-btn--sm">Voters</a>
+        </div>
+
+        <!-- ══════════════ POLLING STATIONS ══════════════ -->
+        <div id="stations" class="evs-section-title" style="scroll-margin-top:20px;">
+            Polling Stations
+        </div>
+
+        <div class="evs-card mb-16">
+            <div class="fw-500 mb-12">Add Polling Station</div>
+            <form method="POST" action="{{ url_for('ecp.islamabad_add_station') }}">
+                <div class="evs-grid-2">
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Station Name</label>
+                        <input type="text" name="station_name" class="evs-input"
+                               placeholder="e.g. F-8 Community Centre" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">City</label>
+                        <select name="city_id" class="evs-input" required>
+                            <option value="">— Select —</option>
+                            {% for c in cities %}
+                            <option value="{{ c.city_id }}">{{ c.city_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="evs-form-group">
+                    <label class="evs-form-label">Full Address</label>
+                    <input type="text" name="address" class="evs-input"
+                           placeholder="e.g. Street 5, F-8/1, Islamabad" required>
+                </div>
+                <button type="submit" class="evs-btn evs-btn--primary">Add Station</button>
+            </form>
+        </div>
+
+        {% if stations %}
+        <div class="evs-card mb-16">
+            <table class="evs-table">
+                <thead>
+                    <tr>
+                        <th>Station Name</th>
+                        <th>Address</th>
+                        <th>City</th>
+                        <th>Officer</th>
+                        <th style="width:80px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in stations %}
+                    <tr>
+                        <td class="fw-500">{{ s.station_name }}</td>
+                        <td class="text-xs text-muted">{{ s.address }}</td>
+                        <td>{{ s.city_name }}</td>
+                        <td>
+                            {% if s.officer_name %}
+                            <span style="color:var(--evs-green);">{{ s.officer_name }}</span>
+                            {% else %}
+                            <span class="evs-badge evs-badge--warning">Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <form method="POST"
+                                  action="{{ url_for('ecp.islamabad_delete_station', station_id=s.station_id) }}"
+                                  onsubmit="return confirm('Delete {{ s.station_name }}?')">
+                                <button type="submit" class="evs-btn evs-btn--danger evs-btn--sm">
+                                    Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- ══════════════ POLLING OFFICERS ══════════════ -->
+        <div id="officers" class="evs-section-title" style="scroll-margin-top:20px;">
+            Polling Officers
+        </div>
+
+        <div class="evs-grid-2 mb-16">
+            <div class="evs-card">
+                <div class="fw-500 mb-12">Add Polling Officer</div>
+                {% if available_stations %}
+                <form method="POST" action="{{ url_for('ecp.islamabad_add_officer') }}">
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Full Name</label>
+                        <input type="text" name="full_name" class="evs-input" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Username</label>
+                        <input type="text" name="username" class="evs-input" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Assign Station</label>
+                        <select name="station_id" class="evs-input" required>
+                            <option value="">— Select —</option>
+                            {% for s in available_stations %}
+                            <option value="{{ s.station_id }}">{{ s.station_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Password</label>
+                        <input type="password" name="password" class="evs-input"
+                               placeholder="Min 8 characters" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Confirm Password</label>
+                        <input type="password" name="confirm_password" class="evs-input" required>
+                    </div>
+                    <button type="submit" class="evs-btn evs-btn--primary evs-btn--full">
+                        Add Officer
+                    </button>
+                </form>
+                {% else %}
+                <div class="evs-alert evs-alert--warning" style="font-size:12px;">
+                    Add a polling station first, or all stations already have officers.
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="evs-card">
+                <div class="fw-500 mb-12">
+                    All Officers
+                    <span class="text-muted text-xs">({{ officers|length }})</span>
+                </div>
+                {% if officers %}
+                <table class="evs-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Username</th>
+                            <th>Station</th>
+                            <th>Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for o in officers %}
+                        <tr>
+                            <td class="fw-500">{{ o.full_name }}</td>
+                            <td class="text-xs text-muted">{{ o.username }}</td>
+                            <td class="text-xs">{{ o.station_name }}</td>
+                            <td>
+                                {% if o.is_active %}
+                                <span class="evs-badge evs-badge--success">Active</span>
+                                {% else %}
+                                <span class="evs-badge evs-badge--danger">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <form method="POST"
+                                      action="{{ url_for('ecp.islamabad_toggle_officer', po_id=o.po_id) }}"
+                                      style="display:inline;">
+                                    <button type="submit"
+                                            class="evs-btn evs-btn--sm {{ 'evs-btn--warning' if o.is_active else 'evs-btn--primary' }}">
+                                        {{ 'Deactivate' if o.is_active else 'Activate' }}
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="text-muted text-sm">No officers added yet.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ══════════════ CANDIDATES ══════════════ -->
+        <div id="candidates" class="evs-section-title" style="scroll-margin-top:20px;">
+            Candidates
+        </div>
+
+        <div class="evs-card mb-16">
+            <div class="fw-500 mb-12">Add Candidate</div>
+            {% if not election_id %}
+            <div class="evs-alert evs-alert--warning">
+                No active or upcoming election. Create an election first from the Dashboard.
+            </div>
+            {% else %}
+            <form method="POST"
+                  action="{{ url_for('ecp.islamabad_add_candidate') }}"
+                  enctype="multipart/form-data">
+                <input type="hidden" name="election_id" value="{{ election_id }}">
+                <div class="evs-grid-2">
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Full Name</label>
+                        <input type="text" name="full_name" class="evs-input" required>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">CNIC</label>
+                        <input type="text" name="cnic" class="evs-input"
+                               placeholder="XXXXX-XXXXXXX-X"
+                               pattern="\d{5}-\d{7}-\d{1}" required>
+                    </div>
+                </div>
+                <div class="evs-grid-2">
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">Party</label>
+                        <select name="party_id" class="evs-input" required>
+                            <option value="">— Select Party —</option>
+                            {% for p in parties %}
+                            <option value="{{ p.party_id }}">
+                                {{ p.party_name }} ({{ p.abbreviation }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="evs-form-group">
+                        <label class="evs-form-label">NA Constituency</label>
+                        <select name="na_id" class="evs-input" required>
+                            <option value="">— Select NA Seat —</option>
+                            {% for n in na_list %}
+                            <option value="{{ n.na_id }}">
+                                {{ n.na_number }} — {{ n.na_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="evs-form-group">
+                    <label class="evs-form-label">Photo (optional)</label>
+                    <input type="file" name="photo" class="evs-input" accept="image/*">
+                </div>
+                <div class="evs-alert evs-alert--info" style="font-size:11px;margin-bottom:12px;">
+                    Islamabad has NA seats only — no Provincial Assembly.
+                </div>
+                <button type="submit" class="evs-btn evs-btn--primary">Add Candidate</button>
+            </form>
+            {% endif %}
+        </div>
+
+        {% if candidates %}
+        <div class="evs-card mb-16">
+            <table class="evs-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>CNIC</th>
+                        <th>Party</th>
+                        <th>NA Seat</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in candidates %}
+                    <tr>
+                        <td class="fw-500">{{ c.full_name }}</td>
+                        <td class="text-xs text-muted">{{ c.cnic }}</td>
+                        <td>
+                            <span class="evs-badge evs-badge--info">{{ c.abbreviation }}</span>
+                        </td>
+                        <td class="text-xs">{{ c.na_number or '—' }}</td>
+                        <td>
+                            <form method="POST"
+                                  action="{{ url_for('ecp.islamabad_delete_candidate', cand_id=c.candidate_id) }}"
+                                  onsubmit="return confirm('Delete {{ c.full_name }}?')">
+                                <button type="submit"
+                                        class="evs-btn evs-btn--danger evs-btn--sm">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- ══════════════ VOTERS ══════════════ -->
+        <div id="voters" class="evs-section-title" style="scroll-margin-top:20px;">
+            Voters
+            <span class="text-muted text-xs">({{ voter_count }} registered)</span>
+        </div>
+
+        <div class="evs-card mb-16">
+            <div class="fw-500 mb-12">Import Voters via CSV</div>
+            <div class="evs-alert evs-alert--info" style="font-size:11px;margin-bottom:12px;">
+                Required columns:
+                <code>cnic, full_name, date_of_birth, gender, city_id, constituency_na_id</code><br>
+                Leave <code>constituency_pa_id</code> blank — Islamabad has no PA seats.<br>
+                CNIC must start with <strong>61XXX</strong> (Islamabad prefix).
+            </div>
+            <form method="POST"
+                  action="{{ url_for('ecp.islamabad_import_voters') }}"
+                  enctype="multipart/form-data">
+                <div class="evs-form-group">
+                    <label class="evs-form-label">Choose CSV file</label>
+                    <input type="file" name="csv_file" class="evs-input"
+                           accept=".csv" required>
+                </div>
+                <button type="submit" class="evs-btn evs-btn--primary">
+                    Upload and Import
+                </button>
+            </form>
+
+            <!-- Reference IDs -->
+            <div class="evs-grid-2" style="margin-top:16px;">
+                <div>
+                    <div class="fw-500 text-xs text-muted mb-8">City IDs</div>
+                    <table class="evs-table">
+                        <thead><tr><th>city_id</th><th>City</th></tr></thead>
+                        <tbody>
+                            {% for c in cities %}
+                            <tr>
+                                <td class="fw-500">{{ c.city_id }}</td>
+                                <td>{{ c.city_name }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <div class="fw-500 text-xs text-muted mb-8">NA Constituency IDs</div>
+                    <table class="evs-table">
+                        <thead><tr><th>na_id</th><th>Seat</th><th>Name</th></tr></thead>
+                        <tbody>
+                            {% for n in na_list %}
+                            <tr>
+                                <td class="fw-500">{{ n.na_id }}</td>
+                                <td>{{ n.na_number }}</td>
+                                <td class="text-xs text-muted">{{ n.na_name }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {% if voters %}
+        <div class="evs-card mb-16">
+            <div class="fw-500 mb-12">
+                Registered Voters
+                <span class="text-muted text-xs">
+                    (showing {{ voters|length }} of {{ voter_count }})
+                </span>
+            </div>
+            <div style="overflow-x:auto;">
+                <table class="evs-table">
+                    <thead>
+                        <tr>
+                            <th>CNIC</th>
+                            <th>Full Name</th>
+                            <th>Gender</th>
+                            <th>City</th>
+                            <th>NA Seat</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in voters %}
+                        <tr>
+                            <td class="text-xs text-muted">{{ v.cnic }}</td>
+                            <td class="fw-500">{{ v.full_name }}</td>
+                            <td>{{ v.gender }}</td>
+                            <td>{{ v.city_name }}</td>
+                            <td class="text-xs">{{ v.na_number }}</td>
+                            <td>
+                                {% if v.has_voted %}
+                                <span class="evs-badge evs-badge--danger">Voted</span>
+                                {% else %}
+                                <span class="evs-badge evs-badge--success">Pending</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+</body>
+</html>

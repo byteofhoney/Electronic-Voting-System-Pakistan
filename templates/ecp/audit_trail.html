@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audit Trail — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<!-- Header -->
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        EVS — ECP Central Control
+    </div>
+    <div class="evs-header__right">
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}"
+           class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-shell">
+
+    <!-- Sidebar -->
+    <div class="evs-sidebar">
+        <a href="{{ url_for('ecp.dashboard') }}" class="evs-sidebar__item">Dashboard</a>
+        <a href="{{ url_for('ecp.parties') }}" class="evs-sidebar__item">Parties</a>
+        <a href="{{ url_for('ecp.officers') }}" class="evs-sidebar__item">Officers</a>
+        <a href="{{ url_for('ecp.results') }}" class="evs-sidebar__item">Results</a>
+        <a href="{{ url_for('ecp.audit_trail') }}" class="evs-sidebar__item active">Audit Trail</a>
+        <a href="{{ url_for('ecp.login_logs') }}" class="evs-sidebar__item">Login Logs</a>
+    </div>
+
+    <div class="evs-content">
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+            <div class="evs-alert evs-alert--{{ 'success' if category == 'success' else 'danger' }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endwith %}
+
+        <!-- Page Title Row -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <div>
+                <div class="fw-500" style="font-size:16px;">Audit Trail</div>
+                <div class="text-muted text-xs">
+                    Showing {{ logs|length }} of {{ total_count }} total records
+                </div>
+            </div>
+
+            <!-- Export button — passes current filters to export route -->
+            <a href="{{ url_for('ecp.export_audit_csv',
+                        role=role_filter,
+                        action_type=action_filter,
+                        date_from=date_from,
+                        date_to=date_to) }}"
+               class="evs-btn evs-btn--primary evs-btn--sm">
+                ⬇ Export CSV
+            </a>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="evs-card mb-16">
+            <form method="GET" action="{{ url_for('ecp.audit_trail') }}">
+                <div class="audit-filter-bar">
+
+                    <div class="evs-form-group" style="margin:0;flex:1;min-width:130px;">
+                        <label class="evs-form-label">Role</label>
+                        <select name="role" class="evs-input">
+                            <option value="">All Roles</option>
+                            <option value="ECP"
+                                {{ 'selected' if role_filter == 'ECP' }}>
+                                ECP
+                            </option>
+                            <option value="Provincial Officer"
+                                {{ 'selected' if role_filter == 'Provincial Officer' }}>
+                                Provincial Officer
+                            </option>
+                            <option value="Polling Officer"
+                                {{ 'selected' if role_filter == 'Polling Officer' }}>
+                                Polling Officer
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="evs-form-group" style="margin:0;flex:1;min-width:150px;">
+                        <label class="evs-form-label">Action Contains</label>
+                        <select name="action_type" class="evs-input">
+                            <option value="">All Actions</option>
+                            <option value="Added"
+                                {{ 'selected' if action_filter == 'Added' }}>
+                                Added
+                            </option>
+                            <option value="Deleted"
+                                {{ 'selected' if action_filter == 'Deleted' }}>
+                                Deleted
+                            </option>
+                            <option value="Updated"
+                                {{ 'selected' if action_filter == 'Updated' }}>
+                                Updated
+                            </option>
+                            <option value="Reset"
+                                {{ 'selected' if action_filter == 'Reset' }}>
+                                Reset Password
+                            </option>
+                            <option value="Activated"
+                                {{ 'selected' if action_filter == 'Activated' }}>
+                                Activated
+                            </option>
+                            <option value="Deactivated"
+                                {{ 'selected' if action_filter == 'Deactivated' }}>
+                                Deactivated
+                            </option>
+                            <option value="Election"
+                                {{ 'selected' if action_filter == 'Election' }}>
+                                Election
+                            </option>
+                        </select>
+                    </div>
+
+                    <div class="evs-form-group" style="margin:0;min-width:130px;">
+                        <label class="evs-form-label">Date From</label>
+                        <input type="date" name="date_from" class="evs-input"
+                               value="{{ date_from }}">
+                    </div>
+
+                    <div class="evs-form-group" style="margin:0;min-width:130px;">
+                        <label class="evs-form-label">Date To</label>
+                        <input type="date" name="date_to" class="evs-input"
+                               value="{{ date_to }}">
+                    </div>
+
+                    <div style="display:flex;gap:6px;align-items:flex-end;padding-bottom:1px;">
+                        <button type="submit"
+                                class="evs-btn evs-btn--primary evs-btn--sm">
+                            Apply
+                        </button>
+                        <a href="{{ url_for('ecp.audit_trail') }}"
+                           class="evs-btn evs-btn--outline evs-btn--sm">
+                            Clear
+                        </a>
+                    </div>
+
+                </div>
+            </form>
+        </div>
+
+        <!-- Active filter summary -->
+        {% if role_filter or action_filter or date_from or date_to %}
+        <div class="evs-alert evs-alert--info mb-16" style="margin-bottom:12px;">
+            Filters active:
+            {% if role_filter %}
+                <strong>Role:</strong> {{ role_filter }}
+            {% endif %}
+            {% if action_filter %}
+                &nbsp;|&nbsp; <strong>Action:</strong> {{ action_filter }}
+            {% endif %}
+            {% if date_from %}
+                &nbsp;|&nbsp; <strong>From:</strong> {{ date_from }}
+            {% endif %}
+            {% if date_to %}
+                &nbsp;|&nbsp; <strong>To:</strong> {{ date_to }}
+            {% endif %}
+            &nbsp;—&nbsp;
+            <a href="{{ url_for('ecp.audit_trail') }}"
+               style="color:var(--evs-blue-dark);font-weight:500;">
+                Clear all
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Audit Table -->
+        <div class="evs-card">
+            {% if logs %}
+            <div style="overflow-x:auto;">
+                <table class="evs-table">
+                    <thead>
+                        <tr>
+                            <th style="width:90px;">Time</th>
+                            <th style="width:130px;">Performed By</th>
+                            <th style="width:120px;">Role</th>
+                            <th>Action</th>
+                            <th style="width:130px;">Table</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="text-xs text-muted" style="white-space:nowrap;">
+                                {% if log.performed_at.__class__.__name__ == 'datetime' %}
+                                    {{ log.performed_at.strftime('%d %b %Y') }}<br>
+                                    <span style="color:var(--evs-text-faint);">
+                                        {{ log.performed_at.strftime('%H:%M:%S') }}
+                                    </span>
+                                {% else %}
+                                    {{ log.performed_at }}
+                                {% endif %}
+                            </td>
+
+                            <td class="fw-500 text-sm">{{ log.performed_by }}</td>
+
+                            <td>
+                                {% if log.role == 'ECP' %}
+                                    <span class="evs-badge evs-badge--success">ECP</span>
+                                {% elif log.role == 'Provincial Officer' %}
+                                    <span class="evs-badge evs-badge--info">Prov. Officer</span>
+                                {% elif log.role == 'Polling Officer' %}
+                                    <span class="evs-badge evs-badge--warning">Polling Officer</span>
+                                {% else %}
+                                    <span class="evs-badge">{{ log.role }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="text-sm">{{ log.action }}</td>
+
+                            <td class="text-xs text-muted">
+                                {{ log.table_affected or '—' }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if total_count > 200 %}
+            <div class="text-muted text-xs" style="margin-top:10px;padding:4px 0;">
+                Showing latest 200 records.
+                Use filters or export CSV to see all {{ total_count }} records.
+            </div>
+            {% endif %}
+
+            {% else %}
+            <div class="text-muted text-sm" style="padding:8px 0;">
+                No audit records found
+                {% if role_filter or action_filter or date_from or date_to %}
+                    matching the current filters.
+                {% else %}
+                    yet.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+    </div><!-- end evs-content -->
+</div><!-- end evs-shell -->
+
+</body>
+</html>

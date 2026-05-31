@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Voters — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">🗳️</span>
+        EVS — Provincial Officer
+    </div>
+    <div class="evs-header__right">
+        <span>{{ username }}</span>
+        <a href="{{ url_for('auth.logout') }}" class="evs-btn evs-btn--ghost-light evs-btn--sm">Logout</a>
+    </div>
+</div>
+
+<div class="evs-shell">
+
+    <div class="evs-sidebar">
+        <a href="{{ url_for('provincial.dashboard') }}"        class="evs-sidebar__item">Dashboard</a>
+        <a href="{{ url_for('provincial.candidates') }}"       class="evs-sidebar__item">Candidates</a>
+        <a href="{{ url_for('provincial.voters') }}"           class="evs-sidebar__item active">Voters</a>
+        <a href="{{ url_for('provincial.stations') }}"         class="evs-sidebar__item">Polling Stations</a>
+        <a href="{{ url_for('provincial.polling_officers') }}"  class="evs-sidebar__item">Polling Officers</a>
+
+    </div>
+
+    <div class="evs-content">
+
+        <div class="evs-alert evs-alert--info mb-16">
+            Voter records are imported by ECP from NADRA data. This view is
+            <strong>read-only</strong> — you can search, filter, and export
+            but cannot add or delete voters.
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="evs-card mb-16">
+            <form method="GET" action="{{ url_for('provincial.voters') }}">
+                <div class="audit-filter-bar">
+                    <div class="evs-form-group" style="margin:0;min-width:200px;flex:2;">
+                        <label class="evs-form-label">Search CNIC</label>
+                        <input type="text" name="cnic" class="evs-input"
+                               placeholder="XXXXX-XXXXXXX-X"
+                               value="{{ search_cnic }}">
+                    </div>
+                    <div class="evs-form-group" style="margin:0;min-width:120px;flex:1;">
+                        <label class="evs-form-label">Gender</label>
+                        <select name="gender" class="evs-input">
+                            <option value="">All</option>
+                            <option value="Male"   {{ 'selected' if gender_filter == 'Male' }}>Male</option>
+                            <option value="Female" {{ 'selected' if gender_filter == 'Female' }}>Female</option>
+                            <option value="Other"  {{ 'selected' if gender_filter == 'Other' }}>Other</option>
+                        </select>
+                    </div>
+                    <div class="evs-form-group" style="margin:0;min-width:140px;flex:1;">
+                        <label class="evs-form-label">City</label>
+                        <select name="city_id" class="evs-input">
+                            <option value="">All Cities</option>
+                            {% for city in cities %}
+                            <option value="{{ city.city_id }}"
+                                {{ 'selected' if city_filter == city.city_id|string }}>
+                                {{ city.city_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="evs-form-group" style="margin:0;min-width:120px;flex:1;">
+                        <label class="evs-form-label">Voted</label>
+                        <select name="voted" class="evs-input">
+                            <option value="">All</option>
+                            <option value="1" {{ 'selected' if voted_filter == '1' }}>Voted</option>
+                            <option value="0" {{ 'selected' if voted_filter == '0' }}>Not Yet</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:flex-end;padding-bottom:1px;">
+                        <button type="submit" class="evs-btn evs-btn--primary evs-btn--sm">Apply</button>
+                        <a href="{{ url_for('provincial.voters') }}"
+                           class="evs-btn evs-btn--outline evs-btn--sm">Clear</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Voters Table -->
+        <div class="evs-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+                <div class="fw-500">
+                    Voters
+                    <span class="text-muted text-xs">
+                        (showing {{ voters|length }} of {{ total_count }})
+                    </span>
+                </div>
+                <a href="{{ url_for('provincial.export_voters_csv',
+                            cnic=search_cnic,
+                            gender=gender_filter,
+                            city_id=city_filter,
+                            voted=voted_filter) }}"
+                   class="evs-btn evs-btn--primary evs-btn--sm">⬇ Export CSV</a>
+                   <a href="{{ url_for('provincial.import_voters') }}"
+                class="evs-btn evs-btn--primary evs-btn--sm">⬆ Import CSV</a>
+            </div>
+
+            {% if voters %}
+            <div style="overflow-x:auto;">
+                <table class="evs-table">
+                    <thead>
+                        <tr>
+                            <th style="width:18%;">CNIC</th>
+                            <th style="width:22%;">Full Name</th>
+                            <th style="width:9%;">Gender</th>
+                            <th style="width:12%;">City</th>
+                            <th style="width:11%;">NA Seat</th>
+                            <th style="width:11%;">PA Seat</th>
+                            <th style="width:10%;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for v in voters %}
+                        <tr>
+                            <td class="text-xs text-muted">{{ v.cnic }}</td>
+                            <td class="fw-500">{{ v.full_name }}</td>
+                            <td>{{ v.gender }}</td>
+                            <td>{{ v.city_name }}</td>
+                            <td class="text-xs">{{ v.na_number }}</td>
+                            <td class="text-xs">{{ v.pa_number or '—' }}</td>
+                            <td>
+                                {% if v.has_voted %}
+                                <span class="evs-badge evs-badge--danger">Voted</span>
+                                {% else %}
+                                <span class="evs-badge evs-badge--success">Pending</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if total_count > 200 %}
+            <div class="text-xs text-muted" style="margin-top:8px;">
+                Showing latest 200. Use filters or Export CSV for full list.
+            </div>
+            {% endif %}
+            {% else %}
+            <div class="text-muted text-sm" style="padding:8px 0;">
+                No voters found
+                {% if search_cnic or gender_filter or city_filter or voted_filter %}
+                    matching the current filters.
+                {% else %}
+                    for this province yet. Contact ECP to import voter data.
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+</body>
+</html>

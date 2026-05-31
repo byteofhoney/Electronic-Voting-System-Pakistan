@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electronic Voting System — Pakistan</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+    :root {
+        --g:        #1a5c2e;
+        --g-dark:   #0c3318;
+        --g-mid:    #1e6b35;
+        --g-light:  #2d8a47;
+        --g-pale:   #eaf3de;
+        --gold:     #c9a84c;
+        --white:    #ffffff;
+        --off-white:#f7f9f5;
+        --text:     #0f1f14;
+        --muted:    #5a6e60;
+        --faint:    #9db0a0;
+        --border:   rgba(0,0,0,0.12);
+        --red:      #b03030;
+        --urdu:     'Noto Nastaliq Urdu', serif;
+        --serif:    'Crimson Pro', Georgia, serif;
+        --mono:     'DM Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+    body {
+        font-family: var(--serif);
+        background: var(--g-dark);
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;      
+        justify-content: center;
+        padding: 32px 16px 60px;       /* generous bottom padding */
+        position: relative;
+        overflow-y: auto;              /* allow scroll */
+        overflow-x: hidden;
+    }
+
+
+   .bg-layer {
+    position: fixed;               /* stays in place while content scrolls */
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+    .bg-layer::before {
+        content: '';
+        position: absolute; inset: 0;
+        background:
+            radial-gradient(ellipse 90% 70% at 15% 10%, rgba(29,90,46,.6) 0%, transparent 55%),
+            radial-gradient(ellipse 70% 90% at 85% 90%, rgba(12,51,24,.8) 0%, transparent 55%),
+            radial-gradient(ellipse 50% 50% at 50% 50%, rgba(18,70,35,.4) 0%, transparent 70%);
+    }
+    .bg-layer::after {
+        content: ''; position: absolute; inset: 0; opacity: .035;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        background-size: 180px 180px;
+    }
+
+    .watermark {
+    position: fixed;               /* was fixed already but confirm this */
+    bottom: -120px;
+    right: -80px;
+    font-size: 500px;
+    line-height: 1;
+    color: rgba(255,255,255,.018);
+    pointer-events: none;
+    z-index: 0;
+    user-select: none;
+    font-family: var(--urdu);
+}
+
+
+   .page {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 460px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 auto;                /* center horizontally */
+}
+
+
+    @keyframes slideUp {
+        from { opacity:0; transform:translateY(22px) scale(.98); }
+        to   { opacity:1; transform:translateY(0)    scale(1);   }
+    }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+    .card-anim { animation: slideUp .38s cubic-bezier(.22,1,.36,1) both; }
+
+    /* ── Masthead ── */
+    .masthead {
+        width:100%; text-align:center;
+        margin-bottom:20px;
+        animation: fadeIn .5s ease .1s both;
+    }
+    .state-emblem {
+        width: 72px;
+        height: auto;
+        /* white emblem is dark green on white bg — invert to show on dark */
+        filter: brightness(0) invert(1);
+        opacity: 0.85;
+        display: block;
+        margin: 0 auto 8px;
+        drop-shadow: 0 0 12px rgba(201,168,76,0.3);
+    }
+
+    .masthead-emblem {
+        flex-direction: column;
+        gap: 6px;
+}
+    
+    .masthead-emblem .emblem-line {
+        display: none; /* clean look without lines when using real emblem */
+    }
+  
+    .masthead-urdu {
+        font-family:var(--urdu); font-size:22px; color:#fff;
+        direction:rtl; line-height:1.9; font-weight:600;
+        display:block; margin-bottom:4px;
+    }
+    .masthead-eng {
+        font-size:11px; color:rgba(255,255,255,.35);
+        letter-spacing:2.5px; text-transform:uppercase;
+        font-weight:300;
+    }
+
+    /* ── Toggle ── */
+    .mode-toggle {
+        display:flex;
+        background:rgba(0,0,0,.3);
+        border:0.5px solid rgba(255,255,255,.08);
+        border-radius:999px; padding:3px; gap:2px;
+        margin-bottom:18px;
+        animation: fadeIn .4s ease .2s both;
+        backdrop-filter: blur(6px);
+    }
+    .mtb {
+        padding:7px 20px; border-radius:999px;
+        font-size:12px; font-weight:400; cursor:pointer;
+        border:none; font-family:var(--serif); letter-spacing:.5px;
+        transition:all .22s cubic-bezier(.22,1,.36,1);
+        color:rgba(255,255,255,.4); background:transparent;
+    }
+    .mtb.on {
+        background:var(--white); color:var(--g-dark);
+        font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.3);
+    }
+
+    /* ── Card ── */
+    .card {
+        width:100%; background:var(--white);
+        border-radius:16px; overflow:hidden;
+        box-shadow:
+            0 24px 80px rgba(0,0,0,.45),
+            0 0 0 .5px rgba(255,255,255,.06),
+            inset 0 1px 0 rgba(255,255,255,.8);
+    }
+    .tricolour { display:flex; height:3px; }
+    .tc-g  { flex:1; background:var(--g); }
+    .tc-w  { flex:1; background:#e8ece6; }
+    .tc-g2 { flex:1; background:var(--g); }
+
+    /* ── Card header ── */
+    .card-head {
+        background: linear-gradient(145deg,var(--g-light) 0%,var(--g) 45%,var(--g-dark) 100%);
+        padding:26px 28px 22px; text-align:center;
+        position:relative; overflow:hidden;
+    }
+    .card-head::before {
+        content:''; position:absolute; bottom:-60px; left:50%;
+        transform:translateX(-50%);
+        width:360px; height:120px; border-radius:50%;
+        background:rgba(255,255,255,.03); pointer-events:none;
+    }
+    .head-badge {
+        display:inline-flex; align-items:center; gap:8px;
+        background:rgba(201,168,76,.15);
+        border:0.5px solid rgba(201,168,76,.35);
+        border-radius:999px; padding:4px 14px; margin-bottom:14px;
+    }
+    .hb-dot { width:5px; height:5px; border-radius:50%; background:var(--gold); }
+    .hb-text {
+        font-size:9px; color:rgba(201,168,76,.9);
+        letter-spacing:1.8px; text-transform:uppercase;
+        font-family:var(--serif); font-weight:600;
+    }
+    .head-crescent { margin:0 auto 12px; display:block; }
+    .head-urdu {
+        font-family:var(--urdu); direction:rtl;
+        font-size:18px; color:#fff; font-weight:600;
+        line-height:1.9; display:block; margin-bottom:2px;
+    }
+    .head-urdu-sub {
+        font-family:var(--urdu); direction:rtl;
+        font-size:13px; color:rgba(255,255,255,.55);
+        font-weight:400; line-height:1.7; display:block;
+    }
+    .head-eng {
+        font-size:9px; color:rgba(255,255,255,.3);
+        letter-spacing:2px; text-transform:uppercase;
+        margin-top:6px; font-family:var(--serif); font-weight:300;
+    }
+
+    /* ── Card body ── */
+    .card-body { padding:24px 28px 28px; }
+
+    /* ── Flash error ── */
+    .flash-error {
+        background:#fff5f5;
+        border:0.5px solid rgba(176,48,48,.25);
+        border-left:3px solid var(--red);
+        border-radius:6px; padding:9px 13px;
+        font-size:12px; color:#7a1f1f;
+        margin-bottom:14px;
+        font-family:var(--serif); font-style:italic;
+    }
+
+    /* ── Instructions ── */
+    .instr-box {
+        background:var(--g-pale);
+        border:0.5px solid rgba(26,92,46,.2);
+        border-radius:10px; padding:14px 16px; margin-bottom:20px;
+    }
+    .instr-row {
+        display:flex; align-items:flex-start;
+        gap:11px; margin-bottom:11px;
+    }
+    .instr-row:last-child { margin-bottom:0; }
+    .instr-num {
+        width:21px; height:21px; border-radius:50%;
+        background:var(--g); color:#fff;
+        font-size:10px; font-weight:600;
+        display:flex; align-items:center; justify-content:center;
+        flex-shrink:0; margin-top:3px; font-family:var(--mono);
+    }
+    .instr-content { flex:1; }
+    .instr-urdu {
+        font-family:var(--urdu); direction:rtl; text-align:right;
+        font-size:13px; color:#1e4a14; line-height:1.8;
+        display:block; margin-bottom:1px;
+    }
+    .instr-eng {
+        font-size:10px; color:#4a7a30; line-height:1.4;
+        display:block; font-family:var(--serif);
+        font-weight:300; font-style:italic;
+    }
+
+    /* ── Form elements ── */
+    .fg { margin-bottom:14px; }
+    .fl {
+        display:flex; align-items:center;
+        justify-content:space-between; margin-bottom:6px;
+    }
+    .fl-eng {
+        font-size:10px; color:var(--muted); font-weight:600;
+        letter-spacing:.8px; text-transform:uppercase; font-family:var(--serif);
+    }
+    .fl-urdu {
+        font-family:var(--urdu); font-size:12px;
+        color:var(--faint); direction:rtl;
+    }
+    .fi {
+        width:100%; padding:11px 14px;
+        border:1px solid var(--border); border-radius:8px;
+        font-size:15px; color:var(--text); outline:none;
+        font-family:var(--mono); letter-spacing:1px;
+        transition:border-color .15s, box-shadow .15s, background .15s;
+        background:var(--off-white);
+    }
+    .fi::placeholder {
+        letter-spacing:.5px; font-size:12px; color:var(--faint);
+        font-family:var(--serif); font-style:italic;
+    }
+    .fi:focus {
+        border-color:var(--g); background:#fff;
+        box-shadow:0 0 0 3px rgba(26,92,46,.09);
+    }
+    .fi.err {
+        border-color:var(--red);
+        box-shadow:0 0 0 3px rgba(176,48,48,.08);
+    }
+    .err-msg {
+        font-size:11px; color:var(--red); margin-top:5px;
+        display:none; font-family:var(--serif); font-style:italic;
+    }
+
+    /* ── Password ── */
+    .pw-wrap { position:relative; }
+    .pw-wrap .fi { padding-right:44px; }
+    .pw-eye {
+        position:absolute; right:12px; top:50%;
+        transform:translateY(-50%);
+        background:none; border:none; cursor:pointer;
+        color:var(--faint); padding:0; font-size:16px;
+        line-height:1; transition:color .14s;
+    }
+    .pw-eye:hover { color:var(--g); }
+
+    /* ── Submit button ── */
+    .sbtn {
+        width:100%; padding:13px;
+        background:var(--g); color:#fff; border:none;
+        border-radius:8px; font-size:14px; font-weight:400;
+        cursor:pointer; font-family:var(--serif); letter-spacing:.5px;
+        transition:background .16s, transform .1s, box-shadow .16s;
+        margin-top:4px;
+        display:flex; align-items:center;
+        justify-content:center; gap:10px;
+        box-shadow:0 2px 12px rgba(26,92,46,.25);
+    }
+    .sbtn:hover {
+        background:var(--g-mid);
+        box-shadow:0 4px 20px rgba(26,92,46,.35);
+    }
+    .sbtn:active { transform:scale(.985); }
+    .sbtn-urdu {
+        font-family:var(--urdu); font-size:15px;
+        direction:rtl; font-weight:500;
+    }
+    .sbtn-div {
+        width:1px; height:14px;
+        background:rgba(255,255,255,.25);
+    }
+
+    /* ── Waiting state ── */
+    .waiting { display:none; text-align:center; padding:8px 0 6px; }
+    .wait-ring-wrap {
+        margin:0 auto 16px; width:52px; height:52px; position:relative;
+    }
+    .wait-ring {
+        width:52px; height:52px;
+        border:2.5px solid var(--g-pale);
+        border-top-color:var(--g);
+        border-radius:50%;
+        animation:spin .95s linear infinite;
+        position:absolute; inset:0;
+    }
+    .wait-ring-inner {
+        position:absolute; inset:8px;
+        border:1.5px solid rgba(26,92,46,.15);
+        border-top-color:var(--gold);
+        border-radius:50%;
+        animation:spin 1.4s linear infinite reverse;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .wait-urdu {
+        font-family:var(--urdu); font-size:15px;
+        color:#1e4a14; direction:rtl; line-height:1.8; margin-bottom:3px;
+    }
+    .wait-eng {
+        font-size:12px; color:var(--muted);
+        font-style:italic; font-family:var(--serif); margin-bottom:6px;
+    }
+    .wait-pulse {
+        display:flex; align-items:center;
+        justify-content:center; gap:5px; margin:8px 0 16px;
+    }
+    .pulse-dot {
+        width:5px; height:5px; border-radius:50%;
+        background:var(--g);
+        animation:pulseDot 1.4s ease-in-out infinite;
+    }
+    .pulse-dot:nth-child(2) { animation-delay:.2s; }
+    .pulse-dot:nth-child(3) { animation-delay:.4s; }
+    @keyframes pulseDot {
+        0%,80%,100% { opacity:.2; transform:scale(.8); }
+        40%         { opacity:1;  transform:scale(1.2); }
+    }
+    .back-btn {
+        padding:7px 18px; border-radius:6px;
+        border:1px solid rgba(26,92,46,.2);
+        background:var(--g-pale); color:#1e4a14;
+        font-size:12px; cursor:pointer;
+        font-family:var(--serif); font-style:italic;
+        transition:background .14s, border-color .14s;
+    }
+    .back-btn:hover {
+        background:rgba(26,92,46,.12);
+        border-color:rgba(26,92,46,.35);
+    }
+
+    /* ── Role chips ── */
+    .roles-row { display:flex; gap:8px; margin-bottom:20px; }
+    .role-chip {
+        flex:1; background:var(--g-pale);
+        border:0.5px solid rgba(26,92,46,.18);
+        border-radius:10px; padding:9px 6px 8px; text-align:center;
+        transition:border-color .14s, background .14s;
+    }
+    .role-chip:hover {
+        background:rgba(26,92,46,.08);
+        border-color:rgba(26,92,46,.3);
+    }
+    .rc-icon { font-size:16px; margin-bottom:4px; line-height:1; }
+    .rc-label {
+        display:block; font-size:9px; color:#1e4a14;
+        font-weight:700; letter-spacing:.6px;
+        text-transform:uppercase; font-family:var(--serif);
+    }
+    .rc-sub {
+        display:block; font-size:9px; color:#4a7a30;
+        margin-top:1px; font-family:var(--serif); font-style:italic;
+    }
+
+    /* ── Note box ── */
+    .note-box {
+        display:flex; align-items:flex-start; gap:9px;
+        background:#faf7ee;
+        border:0.5px solid rgba(201,168,76,.3);
+        border-radius:8px; padding:10px 12px; margin-top:16px;
+    }
+    .note-icon { font-size:13px; flex-shrink:0; margin-top:1px; line-height:1; }
+    .note-text {
+        font-size:11px; color:#5a4a1e; line-height:1.55;
+        font-family:var(--serif); font-style:italic;
+    }
+
+    /* ── Footer ── */
+    .page-footer {
+        margin-top:18px; text-align:center;
+        animation: fadeIn .5s ease .4s both;
+    }
+    .footer-line {
+        display:flex; align-items:center;
+        justify-content:center; gap:10px; margin-bottom:5px;
+    }
+    .footer-dash {
+        width:24px; height:.5px;
+        background:rgba(255,255,255,.15);
+    }
+    .footer-text {
+        font-size:10px; color:rgba(255,255,255,.25);
+        letter-spacing:1px; text-transform:uppercase;
+        font-family:var(--serif); font-weight:300;
+    }
+    .footer-sub {
+        font-size:10px; color:rgba(255,255,255,.15);
+        font-family:var(--serif); font-style:italic;
+    }
+    </style>
+</head>
+<body>
+
+<div class="bg-layer"></div>
+<div class="watermark">☪</div>
+
+<div class="page">
+
+    <!-- Masthead -->
+
+    <div class="masthead">
+        <div class="masthead-emblem">
+            <div class="emblem-line"></div>
+            <img src="{{ url_for('static', filename='images/emblem.png') }}"
+                alt="State Emblem of Pakistan"
+                class="state-emblem">
+            <div class="emblem-line" style="transform:scaleX(-1)"></div>
+        </div>
+        <span class="masthead-urdu">الیکٹرانک ووٹنگ سسٹم — پاکستان</span>
+        <span class="masthead-eng">
+            Electronic Voting System — Islamic Republic of Pakistan
+        </span>
+    </div>
+
+    <!-- Mode toggle -->
+    <div class="mode-toggle">
+        <button class="mtb on" id="btn-voter" onclick="setMode('voter')">
+            Voter Terminal
+        </button>
+        <button class="mtb" id="btn-staff" onclick="setMode('staff')">
+            Staff Login
+        </button>
+    </div>
+
+    <!-- ════════════ VOTER CARD ════════════ -->
+    <div class="card card-anim" id="card-voter">
+        <div class="tricolour">
+            <div class="tc-g"></div><div class="tc-w"></div><div class="tc-g2"></div>
+        </div>
+
+        <div class="card-head">
+            <div class="head-badge">
+                <div class="hb-dot"></div>
+                <span class="hb-text">Voter Terminal</span>
+                <div class="hb-dot"></div>
+            </div>
+            <svg class="head-crescent" width="52" height="52" viewBox="0 0 52 52" fill="none">
+                <circle cx="26" cy="26" r="22" fill="rgba(255,255,255,.06)"/>
+                <path d="M26 7 A19 19 0 0 1 26 45 A15 15 0 0 0 26 7Z"
+                      fill="rgba(255,255,255,.8)"/>
+                
+            </svg>
+            <span class="head-urdu">خوش آمدید! آپ کا ووٹ آپ کی آواز ہے</span>
+            <span class="head-urdu-sub">                 </span>
+            <div class="head-eng">Welcome — Your Vote Is Your Voice</div>
+        </div>
+
+        <div class="card-body">
+
+            {% if error and station_id %}
+            <div class="flash-error">⚠ {{ error }}</div>
+            {% endif %}
+
+            <div class="instr-box">
+                <div class="instr-row">
+                    <div class="instr-num">1</div>
+                    <div class="instr-content">
+                        <span class="instr-urdu">اپنا قومی شناختی کارڈ نمبر اور اپنا پورا نام درج کریں</span>
+                        <span class="instr-eng">Enter your National Identity Card number below</span>
+                    </div>
+                </div>
+                <div class="instr-row">
+                    <div class="instr-num">2</div>
+                    <div class="instr-content">
+                        <span class="instr-urdu">پولنگ آفیسر آپ کی شناخت کی تصدیق کرے گا</span>
+                        <span class="instr-eng">The Polling Officer will verify your identity</span>
+                    </div>
+                </div>
+                <div class="instr-row">
+                    <div class="instr-num">3</div>
+                    <div class="instr-content">
+                        <span class="instr-urdu">تصدیق کے بعد بیلٹ پیپر خودبخود ظاہر ہو گا</span>
+                        <span class="instr-eng">Your ballot will appear automatically after approval</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CNIC form wired to Flask voter route -->
+            <div id="cnic-section">
+                <form method="POST"
+                      action="{{ url_for('voter.vote_login', station_id=station_id or '') }}"
+                      id="voter-form"
+                      onsubmit="return validateVoter()">
+
+                    <input type="hidden" name="station_id"
+                           value="{{ station_id or '' }}">
+
+                    <div class="fg">
+                        <div class="fl">
+                            <span class="fl-eng">CNIC Number</span>
+                            <span class="fl-urdu">شناختی کارڈ نمبر</span>
+                        </div>
+                        <input class="fi" name="cnic" id="cnic-in"
+                               placeholder="XXXXX-XXXXXXX-X"
+                               maxlength="15"
+                               oninput="formatCnic(this)"
+                               autocomplete="off" required/>
+                        <div class="err-msg" id="cnic-err">
+                            Format must be XXXXX-XXXXXXX-X
+                        </div>
+                    </div>
+
+                    <div class="fg">
+                        <div class="fl">
+                            <span class="fl-eng">Full Name</span>
+                            <span class="fl-urdu">پورا نام</span>
+                        </div>
+                        <input class="fi" name="full_name"
+                               placeholder="As printed on your CNIC"
+                               style="letter-spacing:.3px;" required/>
+                    </div>
+
+                    <button type="submit" class="sbtn">
+                        <span class="sbtn-urdu">جمع کرائیں</span>
+                        <span class="sbtn-div"></span>
+                        <span>Submit — Proceed to Verification</span>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Waiting state -->
+            <div class="waiting" id="waiting-state">
+                <div class="wait-ring-wrap">
+                    <div class="wait-ring"></div>
+                    <div class="wait-ring-inner"></div>
+                </div>
+                <div class="wait-urdu">انتظار کریں — پولنگ آفیسر تصدیق کر رہا ہے</div>
+                <div class="wait-eng">
+                    Please wait — Polling Officer is verifying your identity
+                </div>
+                <div class="wait-pulse">
+                    <div class="pulse-dot"></div>
+                    <div class="pulse-dot"></div>
+                    <div class="pulse-dot"></div>
+                </div>
+                <button class="back-btn" type="button" onclick="resetVoter()">
+                    واپس جائیں — Go Back
+                </button>
+            </div>
+
+        </div>
+
+        <div class="tricolour">
+            <div class="tc-g"></div><div class="tc-w"></div><div class="tc-g2"></div>
+        </div>
+    </div><!-- voter card -->
+
+    <!-- ════════════ STAFF CARD ════════════ -->
+    <div class="card card-anim" id="card-staff" style="display:none;">
+        <div class="tricolour">
+            <div class="tc-g"></div><div class="tc-w"></div><div class="tc-g2"></div>
+        </div>
+
+        <div class="card-head">
+            <div class="head-badge">
+                <div class="hb-dot"></div>
+                <span class="hb-text">Staff Access</span>
+                <div class="hb-dot"></div>
+            </div>
+            <svg class="head-crescent" width="52" height="52" viewBox="0 0 52 52" fill="none">
+                <circle cx="26" cy="26" r="22" fill="rgba(255,255,255,.06)"/>
+                <path d="M26 7 A19 19 0 0 1 26 45 A15 15 0 0 0 26 7Z"
+                      fill="rgba(255,255,255,.8)"/>
+              
+            </svg>
+            <span class="head-urdu">الیکٹرانک ووٹنگ سسٹم</span>
+            <span class="head-urdu-sub">عملے کا داخلہ — صرف مجاز افراد</span>
+            <div class="head-eng">Authorised Staff Only — Role Detected Automatically</div>
+        </div>
+
+        <div class="card-body">
+
+            {% if error and not station_id %}
+            <div class="flash-error">⚠ {{ error }}</div>
+            {% endif %}
+
+            <div class="roles-row">
+                <div class="role-chip">
+                    <div class="rc-icon"> </div>
+                    <span class="rc-label">ECP</span>
+                    <span class="rc-sub">Central Control</span>
+                </div>
+                <div class="role-chip">
+                    <div class="rc-icon"> </div>
+                    <span class="rc-label">Provincial</span>
+                    <span class="rc-sub">Officer</span>
+                </div>
+                <div class="role-chip">
+                    <div class="rc-icon"> </div>
+                    <span class="rc-label">Polling</span>
+                    <span class="rc-sub">Officer</span>
+                </div>
+            </div>
+
+            <!-- Staff login form wired to Flask auth route -->
+            <form method="POST" action="{{ url_for('auth.login') }}"
+                  onsubmit="return validateStaff()">
+
+                <div class="fg">
+                    <div class="fl">
+                        <span class="fl-eng">Username</span>
+                        <span class="fl-urdu">صارف نام</span>
+                    </div>
+                    <input class="fi" name="username" id="s-user"
+                           placeholder="Enter your username"
+                           style="letter-spacing:.3px;"
+                           autocomplete="username" required/>
+                    <div class="err-msg" id="user-err">Username is required</div>
+                </div>
+
+                <div class="fg">
+                    <div class="fl">
+                        <span class="fl-eng">Password</span>
+                        <span class="fl-urdu">پاس ورڈ</span>
+                    </div>
+                    <div class="pw-wrap">
+                        <input class="fi" name="password" id="s-pw"
+                               type="password"
+                               placeholder="Enter your password"
+                               style="letter-spacing:.3px;"
+                               autocomplete="current-password" required/>
+                        <button class="pw-eye" type="button"
+                                onclick="togglePw()" id="eye-btn">👁</button>
+                    </div>
+                    <div class="err-msg" id="pw-err">Password is required</div>
+                </div>
+
+                <button type="submit" class="sbtn">
+                    <span class="sbtn-urdu">لاگ ان</span>
+                    <span class="sbtn-div"></span>
+                    <span>Login to System</span>
+                </button>
+
+            </form>
+
+            <div class="note-box">
+                <span class="note-icon">🔒</span>
+                <span class="note-text">
+                    No self-registration. All accounts are created by ECP only.
+                    Your role is detected automatically. Account locks after 5 failed attempts.
+                </span>
+            </div>
+
+        </div>
+
+        <div class="tricolour">
+            <div class="tc-g"></div><div class="tc-w"></div><div class="tc-g2"></div>
+        </div>
+    </div><!-- staff card -->
+
+    <!-- Footer -->
+    <div class="page-footer">
+        <div class="footer-line">
+            <div class="footer-dash"></div>
+            <span class="footer-text" id="footer-label">
+                Polling Station Voter Terminal
+            </span>
+            <div class="footer-dash"></div>
+        </div>
+        <div class="footer-sub">
+            Election Commission of Pakistan &nbsp;·&nbsp; Secure &amp; Confidential
+        </div>
+    </div>
+
+</div><!-- page -->
+
+<script>
+let pwVisible = false;
+
+/* ── Mode switch with re-animation ─ */
+function setMode(mode) {
+    const isVoter = mode === 'voter';
+    const show    = isVoter
+        ? document.getElementById('card-voter')
+        : document.getElementById('card-staff');
+    const hide    = isVoter
+        ? document.getElementById('card-staff')
+        : document.getElementById('card-voter');
+
+    hide.style.display = 'none';
+    show.style.display = '';
+    show.classList.remove('card-anim');
+    void show.offsetWidth;
+    show.classList.add('card-anim');
+
+    document.getElementById('btn-voter').className =
+        'mtb' + (isVoter ? ' on' : '');
+    document.getElementById('btn-staff').className =
+        'mtb' + (isVoter ? '' : ' on');
+    document.getElementById('footer-label').textContent = isVoter
+        ? 'Polling Station Voter Terminal'
+        : 'Staff Access Portal';
+}
+
+/* ── CNIC auto-format ─ */
+function formatCnic(el) {
+    let v = el.value.replace(/[^0-9]/g, '');
+    if (v.length > 12) {
+        v = v.slice(0,5) + '-' + v.slice(5,12) + '-' + v.slice(12);
+    } else if (v.length > 5) {
+        v = v.slice(0,5) + '-' + v.slice(5);
+    }
+    el.value = v.slice(0, 15);
+}
+
+/* ── Voter form validation ─ */
+function validateVoter() {
+    const val = document.getElementById('cnic-in').value;
+    const ok  = /^\d{5}-\d{7}-\d$/.test(val);
+    const inp = document.getElementById('cnic-in');
+    const err = document.getElementById('cnic-err');
+
+    if (!ok) {
+        inp.classList.add('err');
+        err.style.display = 'block';
+        return false;
+    }
+    inp.classList.remove('err');
+    err.style.display = 'none';
+
+    // Show dual spinner while Flask processes request
+    document.getElementById('cnic-section').style.display  = 'none';
+    document.getElementById('waiting-state').style.display = 'block';
+    return true;
+}
+
+/* ── Reset voter form ─ */
+function resetVoter() {
+    document.getElementById('cnic-in').value = '';
+    document.getElementById('cnic-section').style.display  = '';
+    document.getElementById('waiting-state').style.display = 'none';
+    document.getElementById('cnic-in').classList.remove('err');
+    document.getElementById('cnic-err').style.display      = 'none';
+}
+
+/* ── Staff form validation ─ */
+function validateStaff() {
+    const u  = document.getElementById('s-user').value.trim();
+    const p  = document.getElementById('s-pw').value;
+    let ok   = true;
+
+    if (!u) {
+        document.getElementById('s-user').classList.add('err');
+        document.getElementById('user-err').style.display = 'block';
+        ok = false;
+    } else {
+        document.getElementById('s-user').classList.remove('err');
+        document.getElementById('user-err').style.display = 'none';
+    }
+    if (!p) {
+        document.getElementById('s-pw').classList.add('err');
+        document.getElementById('pw-err').style.display = 'block';
+        ok = false;
+    } else {
+        document.getElementById('s-pw').classList.remove('err');
+        document.getElementById('pw-err').style.display = 'none';
+    }
+    return ok;
+}
+
+/* ── Password show/hide ─ */
+function togglePw() {
+    pwVisible = !pwVisible;
+    document.getElementById('s-pw').type          = pwVisible ? 'text' : 'password';
+    document.getElementById('eye-btn').textContent = pwVisible ? '🙈' : '👁';
+}
+
+/* ── Auto-switch to staff mode if Flask returned a
+      staff login error  */
+
+
+{% if error and not station_id %}
+setMode('staff');
+{% endif %}
+</script>
+
+</body>
+</html>

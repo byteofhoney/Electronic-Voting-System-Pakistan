@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Ballot — EVS Pakistan</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .ballot-card {
+            border: 0.5px solid var(--evs-border);
+            border-radius: var(--evs-radius-md);
+            padding: 11px 13px;
+            cursor: pointer;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--evs-surface);
+            transition: border-color 0.15s, background 0.15s;
+            user-select: none;
+        }
+        .ballot-card:hover  { border-color: var(--evs-green); background: #f6fcf8; }
+        .ballot-card.chosen { border: 1.5px solid var(--evs-green); background: #f0f7f2; }
+        .radio-ring {
+            width: 17px; height: 17px;
+            border-radius: 50%;
+            border: 1.5px solid var(--evs-border);
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; margin-left: auto;
+        }
+        .radio-ring.filled {
+            background: var(--evs-green);
+            border-color: var(--evs-green);
+        }
+        .radio-ring.filled::after {
+            content: '';
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+
+<div class="evs-header">
+    <div class="evs-header__brand">
+        <span class="evs-header__brand-icon">☪</span>
+        Official Ballot — EVS Pakistan
+    </div>
+    <div class="evs-header__right">
+        <span class="text-xs" style="color:#b0d8c0;">{{ voter_name }}</span>
+    </div>
+</div>
+
+<div class="evs-content">
+
+    <div class="evs-alert evs-alert--warning mb-16">
+        You cannot go back from this screen. Select <strong>one candidate per section</strong>.
+        Your vote is completely anonymous — no receipt is issued.
+    </div>
+
+    <form method="POST" action="{{ url_for('voter.cast_vote') }}" id="ballot-form">
+
+        <div class="evs-grid-2">
+
+            <!-- NA Candidates -->
+            <div>
+                <div class="evs-section-title">National Assembly</div>
+                {% if na_candidates %}
+                    {% for c in na_candidates %}
+                    <div class="ballot-card" id="na-{{ c.candidate_id }}"
+                         onclick="selectCandidate('na', {{ c.candidate_id }})">
+                        {% if c.photo_path %}
+                            <img src="{{ url_for('static', filename='images/uploads/candidates/' + c.photo_path) }}"
+                                 style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+                        {% else %}
+                            <div class="evs-party-avatar"
+                                 style="background:{{ c.party_color or '#1a5c2e' }};width:34px;height:34px;font-size:11px;">
+                                {{ c.full_name[:2].upper() }}
+                            </div>
+                        {% endif %}
+                        <div style="flex:1;min-width:0;">
+                            <div class="fw-500 text-sm"
+                                 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                {{ c.full_name }}
+                            </div>
+                            <div class="text-xs text-muted">{{ c.party_name }}</div>
+                        </div>
+                        <div class="radio-ring" id="na-ring-{{ c.candidate_id }}"></div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="evs-alert evs-alert--warning">
+                        No NA candidates found for your constituency.
+                        Please see the Polling Officer.
+                    </div>
+                {% endif %}
+                <input type="hidden" name="na_candidate" id="na-input" value="">
+            </div>
+
+            <!-- PA Candidates -->
+            <div>
+                <div class="evs-section-title">Provincial Assembly</div>
+                {% if pa_candidates %}
+                    {% for c in pa_candidates %}
+                    <div class="ballot-card" id="pa-{{ c.candidate_id }}"
+                         onclick="selectCandidate('pa', {{ c.candidate_id }})">
+                        {% if c.photo_path %}
+                            <img src="{{ url_for('static', filename='images/uploads/candidates/' + c.photo_path) }}"
+                                 style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+                        {% else %}
+                            <div class="evs-party-avatar"
+                                 style="background:{{ c.party_color or '#1a5c2e' }};width:34px;height:34px;font-size:11px;">
+                                {{ c.full_name[:2].upper() }}
+                            </div>
+                        {% endif %}
+                        <div style="flex:1;min-width:0;">
+                            <div class="fw-500 text-sm"
+                                 style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                {{ c.full_name }}
+                            </div>
+                            <div class="text-xs text-muted">{{ c.party_name }}</div>
+                        </div>
+                        <div class="radio-ring" id="pa-ring-{{ c.candidate_id }}"></div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-muted text-sm" style="padding:8px 0;">
+                        No PA candidates for your constituency.
+                    </div>
+                {% endif %}
+                <input type="hidden" name="pa_candidate" id="pa-input" value="">
+            </div>
+
+        </div>
+
+        <!-- Cast Vote button -->
+        <div style="text-align:center;margin-top:18px;">
+            <button type="button" id="cast-btn"
+                    class="evs-btn evs-btn--outline evs-btn--lg"
+                    onclick="confirmVote()"
+                    disabled style="opacity:0.45;">
+                Cast Vote — Confirm
+            </button>
+            <div id="cast-hint" class="text-xs text-muted" style="margin-top:8px;">
+                Select one candidate in the National Assembly section to continue
+            </div>
+        </div>
+
+    </form>
+
+</div>
+
+<script>
+const sel = { na: null, pa: null };
+
+function selectCandidate(type, id) {
+    // Clear previous selection for this type
+    if (sel[type]) {
+        document.getElementById(type + '-' + sel[type]).classList.remove('chosen');
+        document.getElementById(type + '-ring-' + sel[type]).classList.remove('filled');
+    }
+    sel[type] = id;
+    document.getElementById(type + '-' + id).classList.add('chosen');
+    document.getElementById(type + '-ring-' + id).classList.add('filled');
+    document.getElementById(type + '-input').value = id;
+    updateCastBtn();
+}
+
+function updateCastBtn() {
+    const btn  = document.getElementById('cast-btn');
+    const hint = document.getElementById('cast-hint');
+    const naOk = sel.na !== null;
+    // PA is optional if no PA candidates rendered
+    const paRequired = document.querySelectorAll('[id^="pa-"]:not([id^="pa-input"])').length > 0;
+    const paOk = !paRequired || sel.pa !== null;
+
+    if (naOk && paOk) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.className = 'evs-btn evs-btn--primary evs-btn--lg';
+        hint.textContent = '';
+    } else if (naOk && !paOk) {
+        hint.textContent = 'Also select a Provincial Assembly candidate';
+    }
+}
+
+function confirmVote() {
+    if (!sel.na) return;
+    if (confirm(
+        'You are about to cast your vote.\n\n' +
+        'This cannot be changed after confirmation.\n\nProceed?'
+    )) {
+        document.getElementById('ballot-form').submit();
+    }
+}
+</script>
+
+</body>
+</html>
