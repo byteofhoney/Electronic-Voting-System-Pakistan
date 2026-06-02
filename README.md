@@ -125,7 +125,7 @@ The schema file creates all 24 tables, foreign key constraints, and seeds:
 
 ```
 Username: ecp_admin
-Password: admin123
+Password: ecp123
 ```
 
 #### Run the Application
@@ -263,6 +263,7 @@ Log in at:
 ```
 http://127.0.0.1:5000/login
 Username: ecp_admin
+Password: ecp123
 ```
 
 From the ECP dashboard:
